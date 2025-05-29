@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/content.js
+dist/popup.js
+dist/styles.css
+
+# OS and editor files
+.DS_Store
+.vscode/
+*.log
+
+# Package manager files
+package-lock.json
+yarn.lock 

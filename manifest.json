@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Amazon Vine Efficiency Enhancer",
+  "version": "1.0.0",
+  "description": "Enhance Amazon Vine browsing efficiency with title expansion, marking seen items, filtering, and keyboard navigation",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://www.amazon.com/vine/*",
+        "*://www.amazon.com/hz/vine/*",
+        "*://www.amazon.co.uk/vine/*",
+        "*://www.amazon.co.uk/hz/vine/*",
+        "*://www.amazon.de/vine/*",
+        "*://www.amazon.de/hz/vine/*",
+        "*://www.amazon.fr/vine/*",
+        "*://www.amazon.fr/hz/vine/*",
+        "*://www.amazon.es/vine/*",
+        "*://www.amazon.es/hz/vine/*",
+        "*://www.amazon.it/vine/*",
+        "*://www.amazon.it/hz/vine/*",
+        "*://www.amazon.ca/vine/*",
+        "*://www.amazon.ca/hz/vine/*",
+        "*://www.amazon.com.au/vine/*",
+        "*://www.amazon.com.au/hz/vine/*",
+        "*://www.amazon.co.jp/vine/*",
+        "*://www.amazon.co.jp/hz/vine/*"
+      ],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "48": "icons/icon-48x48.jpg",
+    "128": "icons/icon-128x128.jpg"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Amazon Vine Efficiency Enhancer"
+  }
+} 
