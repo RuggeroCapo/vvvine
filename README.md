@@ -25,9 +25,17 @@ A Chrome extension designed to dramatically improve your efficiency when browsin
 ### ⌨️ **Keyboard Navigation**
 - **J/K**: Navigate between items (vim-style)
 - **H**: Hide/mark current item as seen
+- **A**: Toggle auto-navigation (infinite scroll)
 - **Space**: Toggle title expansion
 - **Ctrl + ←/→**: Navigate between pages instantly
 - **Escape**: Clear current filter
+
+### 🔄 **Auto-Navigation (Infinite Scroll)**
+- Automatically navigates to the next page when pagination becomes visible
+- Detects "Next" button and navigates after a 2-second delay
+- Stops automatically when reaching the last page
+- Visual indicator shows auto-navigation status
+- Toggle on/off with **A** key or enabled by default
 
 ### 📊 **Smart Interface**
 - Sticky control panel with quick actions
@@ -82,6 +90,7 @@ Navigate efficiently without touching your mouse:
 | `J` | Move to next item |
 | `K` | Move to previous item |
 | `H` | Hide/mark current item as seen |
+| `A` | Toggle auto-navigation (infinite scroll) |
 | `Space` | Toggle title expansion |
 | `Ctrl + ←` | Previous page |
 | `Ctrl + →` | Next page |
@@ -173,6 +182,13 @@ cd topvine
 ```
 
 ## 📝 Changelog
+
+### Version 1.1.0
+- ✅ Auto-navigation (infinite scroll) functionality
+- ✅ Automatic next page detection and navigation
+- ✅ Visual indicators for auto-navigation status
+- ✅ Keyboard shortcut (A) to toggle auto-navigation
+- ✅ Enhanced current item highlighting with animation
 
 ### Version 1.0.0
 - ✅ Full title expansion

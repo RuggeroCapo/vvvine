@@ -1,14 +1,10 @@
-// Amazon Vine Efficiency Enhancer - Content Script
-// Implements: Title expansion, mark as seen, filtering, keyboard navigation, infinite scroll
+// Amazon Vine Efficiency Enhancer - Main Controller
+// Orchestrates all manager modules for enhanced Vine browsing
 
 class AmazonVineEnhancer {
   constructor() {
-    this.seenItems = new Set();
-    this.currentPage = this.getCurrentPageNumber();
-    this.isLoading = false;
-    this.keyboardMode = false;
-    this.currentItemIndex = 0;
-    this.items = [];
+    this.managers = {};
+    this.isInitialized = false;
     
     this.init();
   }
@@ -16,18 +12,25 @@ class AmazonVineEnhancer {
   async init() {
     console.log('Amazon Vine Efficiency Enhancer - Initializing...');
     
-    // Load saved data
-    await this.loadSeenItems();
-    
-    // Wait for grid to be available
-    this.waitForGrid().then(() => {
-      this.setupInterface();
-      this.expandAllTitles();
-      this.markSeenItems();
-      this.setupKeyboardNavigation();
-      this.setupInfiniteScroll();
-      this.updateItemsList();
-    });
+    try {
+      // Wait for the grid to be available
+      await this.waitForGrid();
+      
+      // Initialize all managers in the correct order
+      await this.initializeManagers();
+      
+      // Setup cross-manager communication
+      this.setupManagerCommunication();
+      
+      // Start all managers
+      await this.startManagers();
+      
+      this.isInitialized = true;
+      console.log('Amazon Vine Efficiency Enhancer - Fully initialized');
+      
+    } catch (error) {
+      console.error('Failed to initialize Amazon Vine Enhancer:', error);
+    }
   }
 
   waitForGrid() {
@@ -44,342 +47,187 @@ class AmazonVineEnhancer {
     });
   }
 
-  getCurrentPageNumber() {
-    const urlParams = new URLSearchParams(window.location.search);
-    return parseInt(urlParams.get('page')) || 1;
-  }
-
-  // Helper method to extract item title consistently
-  extractItemTitle(item) {
-    const title = item.querySelector('.a-truncate-full')?.textContent || 
-                 item.querySelector('.a-truncate-cut')?.textContent || '';
-    return title.trim(); // Normalize by trimming whitespace
-  }
-
-  async loadSeenItems() {
-    try {
-      // First, try to load title-based seen items
-      const result = await chrome.storage.local.get(['vineSeenTitles']);
-      this.seenItems = new Set(result.vineSeenTitles || []);
-      
-      
-      console.log(`Loaded ${this.seenItems.size} seen items`);
-    } catch (error) {
-      console.error('Error loading seen items:', error);
-    }
-  }
-
-  async saveSeenItems() {
-    try {
-      await chrome.storage.local.set({
-        vineSeenTitles: Array.from(this.seenItems)
+  async initializeManagers() {
+    // Create managers in dependency order
+    this.managers.storage = new StorageManager();
+    this.managers.filter = new FilterManager();
+    this.managers.seenItems = new SeenItemsManager();
+    this.managers.ui = new UIManager();
+    this.managers.keyboard = new KeyboardManager();
+    this.managers.page = new PageManager();
+    setInterval(() => {
+      const fullTitles = document.querySelectorAll('.a-truncate-full');
+      if (fullTitles) {
+      // Remove all truncation classes and attributes - always show full title
+      fullTitles.forEach(title => {
+        title.classList.remove('a-offscreen');
+        title.style.clip = 'unset !important';
+        title.style.clipPath = 'unset !important';
+        title.style.position = 'static !important';
+        title.style.display = 'block !important';
+        title.style.position = 'relative !important';
       });
-    } catch (error) {
-      console.error('Error saving seen items:', error);
+    }
+  }, 300);
+  }
+
+  setupManagerCommunication() {
+    // Setup dependencies between managers
+    this.managers.seenItems.setStorageManager(this.managers.storage);
+    
+    // Special keyboard manager event handling for seen items
+    window.vineEventBus.on('toggleItemSeen', (data) => {
+      this.managers.seenItems.toggleItemSeen(data.title, data.item);
+    });
+    
+    // Expose some managers globally for advanced usage
+    window.vinePageManager = this.managers.page;
+    window.vineKeyboardManager = this.managers.keyboard;
+    window.vineStorageManager = this.managers.storage;
+  }
+
+  async startManagers() {
+    // Initialize managers in the correct order
+    const initOrder = [
+      'storage',    // Must be first to load seen items
+      'title',      // Independent
+      'filter',     // Independent  
+      'seenItems',  // Depends on storage
+      'ui',         // Needs to be available for status updates
+      'keyboard',   // Coordinates with other managers
+      'page'        // Independent
+    ];
+
+    for (const managerName of initOrder) {
+      const manager = this.managers[managerName];
+      if (manager) {
+        try {
+          await manager.init();
+          console.log(`✓ ${managerName} manager initialized`);
+          
+          // Enable auto-navigation after page manager is initialized
+          if (managerName === 'page') {
+            manager.enableAutoNavigation();
+            console.log('✓ Auto-navigation enabled for infinite scroll');
+          }
+        } catch (error) {
+          console.error(`✗ Failed to initialize ${managerName} manager:`, error);
+        }
+      }
     }
   }
 
-  setupInterface() {
-    // Create control panel
-    const controlPanel = document.createElement('div');
-    controlPanel.id = 'vine-enhancer-panel';
-    controlPanel.innerHTML = `
-      <div class="vine-controls">
-        <button id="toggle-titles" title="Toggle Full Titles (Space)">📄 Full Titles</button>
-        <button id="mark-all-seen" title="Mark All as Seen">👁️ Mark All Seen</button>
-        <button id="hide-seen" title="Hide/Show Seen Items">🙈 Toggle Seen</button>
-        <button id="clear-seen" title="Clear All Seen Items">🗑️ Clear Seen</button>
-        <input type="text" id="filter-input" placeholder="Filter products..." title="Filter current page">
-        <span id="status-info">Page ${this.currentPage} | ${this.seenItems.size} seen</span>
-      </div>
-    `;
-
-    // Insert control panel at the top of the page
-    const grid = document.getElementById('vvp-items-grid');
-    grid.parentNode.insertBefore(controlPanel, grid);
-
-    // Setup event listeners
-    this.setupControlListeners();
+  // Utility methods for external access
+  getManager(name) {
+    return this.managers[name];
   }
 
-  setupControlListeners() {
-    document.getElementById('toggle-titles').addEventListener('click', () => {
-      this.toggleAllTitles();
-    });
-
-    document.getElementById('mark-all-seen').addEventListener('click', () => {
-      this.markAllCurrentPageAsSeen();
-    });
-
-    document.getElementById('hide-seen').addEventListener('click', () => {
-      this.toggleSeenItems();
-    });
-
-    document.getElementById('clear-seen').addEventListener('click', () => {
-      this.clearAllSeenItems();
-    });
-
-    document.getElementById('filter-input').addEventListener('input', (e) => {
-      this.filterItems(e.target.value);
-    });
+  getAllManagers() {
+    return { ...this.managers };
   }
 
-  // Feature 1: Full Title Expander
-  expandAllTitles() {
-    const titles = document.querySelectorAll('.a-truncate');
-    titles.forEach(titleContainer => {
-      const fullTitle = titleContainer.querySelector('.a-truncate-full');
-      const cutTitle = titleContainer.querySelector('.a-truncate-cut');
-      
-      if (fullTitle && cutTitle) {
-        // Show full title
-        fullTitle.classList.remove('a-offscreen');
-        cutTitle.style.display = 'none';
+  async reinitialize() {
+    if (this.isInitialized) {
+      this.cleanup();
+    }
+    await this.init();
+  }
+
+  cleanup() {
+    // Cleanup all managers
+    Object.values(this.managers).forEach(manager => {
+      if (manager && typeof manager.cleanup === 'function') {
+        manager.cleanup();
       }
     });
+    
+    // Clear global references
+    delete window.vinePageManager;
+    delete window.vineKeyboardManager;
+    delete window.vineStorageManager;
+    
+    this.managers = {};
+    this.isInitialized = false;
+    
+    console.log('Amazon Vine Enhancer - Cleaned up');
   }
 
-  toggleAllTitles() {
-    const titles = document.querySelectorAll('.a-truncate');
-    const isExpanded = !document.querySelector('.a-truncate-full.a-offscreen');
+  // Debug and development helpers
+  getStatus() {
+    return {
+      isInitialized: this.isInitialized,
+      managers: Object.keys(this.managers),
+      managerStates: this.getManagerStates()
+    };
+  }
+
+  getManagerStates() {
+    const states = {};
     
-    titles.forEach(titleContainer => {
-      const fullTitle = titleContainer.querySelector('.a-truncate-full');
-      const cutTitle = titleContainer.querySelector('.a-truncate-cut');
-      
-      if (fullTitle && cutTitle) {
-        if (isExpanded) {
-          // Collapse
-          fullTitle.classList.add('a-offscreen');
-          cutTitle.style.display = '';
-        } else {
-          // Expand
-          fullTitle.classList.remove('a-offscreen');
-          cutTitle.style.display = 'none';
+    Object.entries(this.managers).forEach(([name, manager]) => {
+      if (manager) {
+        states[name] = {
+          initialized: manager.isInitialized || false,
+          hasCleanup: typeof manager.cleanup === 'function'
+        };
+        
+        // Add specific state information for each manager type
+        switch (name) {
+          case 'storage':
+            states[name].seenCount = manager.getSeenItemsCount();
+            break;
+          case 'title':
+            states[name].expanded = manager.isExpanded;
+            break;
+          case 'filter':
+            states[name].currentFilter = manager.getCurrentFilter();
+            break;
+          case 'keyboard':
+            states[name].navigationStatus = manager.getNavigationStatus();
+            break;
+          case 'page':
+            states[name].pageInfo = manager.getPageInfo();
+            break;
         }
       }
     });
-  }
-
-  // Feature 2: Mark as Seen / Hide Item
-  markSeenItems() {
-    const items = document.querySelectorAll('.vvp-item-tile');
-    items.forEach(item => {
-      const title = this.extractItemTitle(item);
-      if (this.seenItems.has(title)) {
-        item.classList.add('vine-seen');
-      }
-      
-      // Add click handler to mark as seen
-      item.addEventListener('click', (e) => {
-        if (e.ctrlKey || e.target.classList.contains('vine-mark-seen')) {
-          e.preventDefault();
-          this.toggleItemSeen(title, item);
-        }
-      });
-
-      // Add mark as seen button
-      this.addMarkSeenButton(item, title);
-    });
-  }
-
-  addMarkSeenButton(item, title) {
-    const button = document.createElement('button');
-    button.className = 'vine-mark-seen';
-    button.innerHTML = this.seenItems.has(title) ? '👁️' : '👀';
-    button.title = 'Toggle seen status (H)';
-    button.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.toggleItemSeen(title, item);
-    });
-
-    const content = item.querySelector('.vvp-item-tile-content');
-    content.appendChild(button);
-  }
-
-  toggleItemSeen(title, item) {
-    if (this.seenItems.has(title)) {
-      this.seenItems.delete(title);
-      item.classList.remove('vine-seen');
-      item.querySelector('.vine-mark-seen').innerHTML = '👀';
-    } else {
-      this.seenItems.add(title);
-      item.classList.add('vine-seen');
-      item.querySelector('.vine-mark-seen').innerHTML = '👁️';
-    }
     
-    this.saveSeenItems();
-    this.updateStatusInfo();
+    return states;
   }
 
-  markAllCurrentPageAsSeen() {
-    const items = document.querySelectorAll('.vvp-item-tile');
-    items.forEach(item => {
-      const title = this.extractItemTitle(item);
-      this.seenItems.add(title);
-      item.classList.add('vine-seen');
-      const button = item.querySelector('.vine-mark-seen');
-      if (button) button.innerHTML = '👁️';
-    });
-    
-    this.saveSeenItems();
-    this.updateStatusInfo();
+  // Performance monitoring
+  getPerformanceMetrics() {
+    return {
+      initializationTime: this.initializationTime,
+      managerCount: Object.keys(this.managers).length,
+      memoryUsage: this.getApproximateMemoryUsage(),
+      pageMetrics: this.managers.page?.getPageLoadMetrics()
+    };
   }
 
-  toggleSeenItems() {
-    const seenItems = document.querySelectorAll('.vine-seen');
-    const isHidden = seenItems.length > 0 && seenItems[0].style.display === 'none';
-    
-    seenItems.forEach(item => {
-      item.style.display = isHidden ? '' : 'none';
-    });
-  }
-
-  clearAllSeenItems() {
-    if (confirm('Clear all seen items? This cannot be undone.')) {
-      this.seenItems.clear();
-      document.querySelectorAll('.vine-seen').forEach(item => {
-        item.classList.remove('vine-seen');
-        const button = item.querySelector('.vine-mark-seen');
-        if (button) button.innerHTML = '👀';
-      });
-      this.saveSeenItems();
-      this.updateStatusInfo();
+  getApproximateMemoryUsage() {
+    // Rough estimate of memory usage
+    if (performance.memory) {
+      return {
+        used: performance.memory.usedJSHeapSize,
+        total: performance.memory.totalJSHeapSize,
+        limit: performance.memory.jsHeapSizeLimit
+      };
     }
-  }
-
-  // Feature 3: Client-Side Filtering
-  filterItems(query) {
-    const items = document.querySelectorAll('.vvp-item-tile');
-    const lowerQuery = query.toLowerCase();
-    
-    items.forEach(item => {
-      const title = this.extractItemTitle(item);
-      
-      const matches = title.toLowerCase().includes(lowerQuery);
-      item.style.display = matches || !query ? '' : 'none';
-    });
-  }
-
-  // Feature 4: Keyboard Navigation
-  setupKeyboardNavigation() {
-    document.addEventListener('keydown', (e) => {
-      // Only handle when not in input fields
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        return;
-      }
-
-      switch(e.key) {
-        case ' ':
-          e.preventDefault();
-          this.toggleAllTitles();
-          break;
-        case 'h':
-        case 'H':
-          e.preventDefault();
-          if (this.items[this.currentItemIndex]) {
-            const item = this.items[this.currentItemIndex];
-            const title = this.extractItemTitle(item);
-            this.toggleItemSeen(title, item);
-          }
-          break;
-        case 'j':
-        case 'J':
-          e.preventDefault();
-          this.navigateItems(1);
-          break;
-        case 'k':
-        case 'K':
-          e.preventDefault();
-          this.navigateItems(-1);
-          break;
-        case 'Escape':
-          e.preventDefault();
-          document.getElementById('filter-input').value = '';
-          this.filterItems('');
-          break;
-        case 'ArrowLeft':
-          if (e.ctrlKey) {
-            e.preventDefault();
-            this.navigatePages(-1);
-          }
-          break;
-        case 'ArrowRight':
-          if (e.ctrlKey) {
-            e.preventDefault();
-            this.navigatePages(1);
-          }
-          break;
-      }
-    });
-  }
-
-  updateItemsList() {
-    this.items = Array.from(document.querySelectorAll('.vvp-item-tile:not([style*="display: none"])'));
-  }
-
-  navigateItems(direction) {
-    this.updateItemsList();
-    
-    // Remove previous highlight
-    document.querySelectorAll('.vine-current-item').forEach(item => {
-      item.classList.remove('vine-current-item');
-    });
-
-    // Update index
-    this.currentItemIndex = Math.max(0, Math.min(this.items.length - 1, this.currentItemIndex + direction));
-    
-    // Highlight current item
-    if (this.items[this.currentItemIndex]) {
-      const currentItem = this.items[this.currentItemIndex];
-      currentItem.classList.add('vine-current-item');
-      currentItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }
-
-  navigatePages(direction) {
-    const newPage = this.currentPage + direction;
-    if (newPage > 0) {
-      const url = new URL(window.location);
-      url.searchParams.set('page', newPage);
-      window.location.href = url.toString();
-    }
-  }
-
-  // Feature 5: Infinite Scroll (Optional)
-  setupInfiniteScroll() {
-    // For now, just setup the detection for future implementation
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting && !this.isLoading) {
-          // Future: Auto-load next page
-          console.log('Near end of page - could auto-load next page');
-        }
-      });
-    });
-
-    // Observe the last item
-    const lastItem = document.querySelector('.vvp-item-tile:last-child');
-    if (lastItem) {
-      observer.observe(lastItem);
-    }
-  }
-
-  updateStatusInfo() {
-    const statusElement = document.getElementById('status-info');
-    if (statusElement) {
-      const visibleItems = document.querySelectorAll('.vvp-item-tile:not([style*="display: none"])').length;
-      statusElement.textContent = `Page ${this.currentPage} | ${this.seenItems.size} seen | ${visibleItems} visible`;
-    }
+    return null;
   }
 }
+
+// Global access for debugging
+let vineEnhancer = null;
 
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    new AmazonVineEnhancer();
+    vineEnhancer = new AmazonVineEnhancer();
+    window.vineEnhancer = vineEnhancer; // Global access for debugging
   });
 } else {
-  new AmazonVineEnhancer();
+  vineEnhancer = new AmazonVineEnhancer();
+  window.vineEnhancer = vineEnhancer; // Global access for debugging
 } 

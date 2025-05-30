@@ -1,0 +1,511 @@
+/* Amazon Vine Efficiency Enhancer - Enhanced Styles with Tailwind-inspired utilities */
+
+/* Core utility classes inspired by Tailwind for consistency */
+.vine-flex { display: flex; }
+.vine-items-center { align-items: center; }
+.vine-justify-between { justify-content: space-between; }
+.vine-gap-2 { gap: 8px; }
+.vine-gap-3 { gap: 12px; }
+.vine-p-2 { padding: 8px; }
+.vine-p-3 { padding: 12px; }
+.vine-p-4 { padding: 16px; }
+.vine-px-3 { padding-left: 12px; padding-right: 12px; }
+.vine-py-2 { padding-top: 8px; padding-bottom: 8px; }
+.vine-m-0 { margin: 0; }
+.vine-mb-2 { margin-bottom: 8px; }
+.vine-mb-4 { margin-bottom: 16px; }
+.vine-mt-4 { margin-top: 16px; }
+.vine-my-3 { margin-top: 12px; margin-bottom: 12px; }
+.vine-rounded { border-radius: 6px; }
+.vine-rounded-lg { border-radius: 8px; }
+.vine-rounded-full { border-radius: 50%; }
+.vine-border { border: 1px solid #d1d5db; }
+.vine-border-2 { border: 2px solid #d1d5db; }
+.vine-bg-white { background-color: white; }
+.vine-bg-gray-50 { background-color: #f9fafb; }
+.vine-bg-gray-200 { background-color: #e5e7eb; }
+.vine-bg-blue-500 { background-color: #3b82f6; }
+.vine-bg-blue-600 { background-color: #2563eb; }
+.vine-bg-red-600 { background-color: #dc2626; }
+.vine-text-white { color: white; }
+.vine-text-sm { font-size: 14px; }
+.vine-text-xs { font-size: 12px; }
+.vine-font-medium { font-weight: 500; }
+.vine-font-bold { font-weight: 700; }
+.vine-shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+.vine-shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+.vine-transition { transition: all 0.2s ease; }
+.vine-cursor-pointer { cursor: pointer; }
+.vine-sticky { position: sticky; }
+.vine-top-0 { top: 0; }
+.vine-z-1000 { z-index: 1000; }
+.vine-absolute { position: absolute; }
+.vine-relative { position: relative; }
+.vine-top-2 { top: 8px; }
+.vine-right-2 { right: 8px; }
+.vine-w-8 { width: 32px; }
+.vine-h-8 { height: 32px; }
+.vine-z-10 { z-index: 10; }
+.vine-opacity-60 { opacity: 0.6; }
+.vine-opacity-90 { opacity: 0.9; }
+
+/* Control Panel Styles */
+#vine-enhancer-panel {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  margin: 10px 0;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.vine-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  flex-wrap: wrap;
+}
+
+.vine-controls button {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.vine-controls button:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.vine-controls button:active {
+  transform: translateY(0);
+}
+
+.vine-controls button:disabled {
+  background: #6b7280;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Slider container integration */
+.vine-slider-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+}
+
+.vine-slider-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+  user-select: none;
+}
+
+#filter-input {
+  padding: 8px 12px;
+  border: 2px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  min-width: 200px;
+  transition: all 0.2s ease;
+}
+
+#filter-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+#status-info {
+  background: #f9fafb;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #4b5563;
+  border: 1px solid #d1d5db;
+  font-family: 'Courier New', monospace;
+}
+
+/* Enhanced card content layout */
+.vvp-item-tile-content {
+  position: relative !important;
+  padding: 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  height: 100% !important;
+}
+
+/* Enhanced image styling */
+.vvp-item-tile-content > img {
+  width: 100% !important;
+  max-width: 200px !important;
+  height: auto !important;
+  border-radius: 8px !important;
+  align-self: center !important;
+  object-fit: contain !important;
+  transition: transform 0.2s ease !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+.vvp-item-tile:hover .vvp-item-tile-content > img {
+  transform: scale(1.02) !important;
+}
+
+/* Enhanced title container */
+.vvp-item-product-title-container {
+  flex: 1 !important;
+  margin: 8px 0 !important;
+}
+
+.vvp-item-product-title-container a {
+  text-decoration: none !important;
+  color: #1f2937 !important;
+  display: block !important;
+  line-height: 1.4 !important;
+  font-weight: 500 !important;
+  transition: color 0.2s ease !important;
+}
+
+.vvp-item-product-title-container a:hover {
+  color: #3b82f6 !important;
+}
+
+/* Title Enhancement - ALWAYS show full title (NO TOGGLING) */
+.a-truncate {
+  overflow: visible !important;
+  max-height: none !important;
+  height: auto !important;
+  white-space: normal !important;
+  text-overflow: unset !important;
+}
+
+/* Full title should ALWAYS be visible */
+.a-truncate-full {
+  position: static !important;
+  display: block !important;
+  clip: unset !important;
+  clip-path: unset !important;
+  line-height: 1.5 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #374151 !important;
+  margin-bottom: 8px !important;
+  /* Ensure visibility is never overridden */
+  visibility: visible !important;
+  opacity: 1 !important;
+  white-space: normal !important;
+  text-overflow: unset !important;
+}
+
+/* Truncated version should ALWAYS be hidden */
+.a-truncate-cut {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Additional rule to force full title display */
+.vvp-item-product-title-container .a-truncate {
+  -webkit-line-clamp: unset !important;
+  display: block !important;
+  white-space: normal !important;
+  word-wrap: break-word !important;
+}
+
+/* Enhanced detail button styling */
+.vvp-details-btn {
+  margin-top: auto !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+  transition: all 0.2s ease !important;
+  border: 2px solid #3b82f6 !important;
+}
+  
+.vvp-details-btn:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px -1px rgba(59, 130, 246, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  border-color: #2563eb !important;
+}
+
+.vvp-details-btn .a-button-inner {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+  border: none !important;
+  padding: 12px 16px !important;
+  border-radius: 6px !important;
+  padding: 20px !important;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+
+}
+
+.vvp-details-btn .a-button-text {
+  color: white !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+  position: relative !important;
+}
+
+/* Enhanced mark seen button */
+.vine-mark-seen {
+  position: absolute !important;
+  top: 12px !important;
+  right: 12px !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 50% !important;
+  width: 36px !important;
+  height: 36px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  font-size: 16px !important;
+  transition: all 0.2s ease !important;
+  z-index: 20 !important;
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1) !important;
+}
+
+.vine-mark-seen:hover {
+  background: white !important;
+  transform: scale(1.1) !important;
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.15) !important;
+  border-color: #3b82f6 !important;
+}
+
+.vine-mark-seen:active {
+  transform: scale(0.95) !important;
+}
+
+/* Item state styles with enhanced specificity for Amazon pages */
+.vine-seen {
+  opacity: 0.7 !important;
+  border: 2px solid #10b981 !important;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.02) 100%) !important;
+}
+
+.vine-seen .vine-mark-seen {
+  background: rgba(16, 185, 129, 0.95) !important;
+  color: white !important;
+  border-color: #10b981 !important;
+}
+/* Enhanced grid layout */
+#vvp-items-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+  gap: 20px !important;
+  padding: 0 16px !important;
+  margin-top: 20px !important;
+}
+
+/* Notification Styles */
+.vine-notification {
+  animation: vineSlideIn 0.3s ease-out;
+}
+
+@keyframes vineSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Page Navigation Styles */
+.vine-page-navigation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: #f9fafb;
+  border-radius: 6px;
+  margin: 10px 0;
+}
+
+.vine-page-navigation button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vine-page-navigation button:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.vine-page-navigation button:disabled {
+  background: #6b7280;
+  cursor: not-allowed;
+}
+
+.vine-page-navigation input {
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  width: 100px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .vine-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .vine-controls button,
+  #filter-input {
+    width: 100%;
+    text-align: center;
+  }
+  
+  #status-info {
+    text-align: center;
+  }
+
+  #vvp-items-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+    padding: 0 8px !important;
+  }
+
+  .vvp-item-tile-content {
+    padding: 12px !important;
+  }
+
+  .vine-mark-seen {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 14px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .vvp-item-tile-content > img {
+    max-width: 150px !important;
+  }
+}
+
+/* Loading indicator */
+.vine-loading {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #d1d5db;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: vineSpinner 1.2s linear infinite;
+}
+
+.vine-loading::after {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 1px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: #3b82f6;
+  animation: vineSpinner 1.2s linear infinite;
+}
+
+@keyframes vineSpinner {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Focus styles for accessibility */
+.vine-controls button:focus,
+#filter-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #3b82f6, 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+.vine-mark-seen:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #3b82f6, 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+
+/* Auto-navigation styles */
+#vine-auto-navigation-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #232f3e;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 5px;
+  z-index: 9999;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  animation: vineSlideIn 0.3s ease-out;
+}
+
+@keyframes vineSlideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes vineSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes vineSlideDown {
+  from { transform: translateX(-50%) translateY(-100%); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+
+@keyframes vineBounce {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(5px); }
+}
+
+/* Auto-navigation visual indicators */
+.vine-auto-navigation-active .a-pagination {
+  animation: vinePulse 2s infinite;
+}
+
+@keyframes vinePulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.6); }
+}
+
+.vvp-item-tile {
+  border: 1px solid #000;
+} 

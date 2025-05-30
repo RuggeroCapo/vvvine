@@ -4,146 +4,79 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Amazon Vine Efficiency Enhancer</title>
-  <style>
-    body {
-      width: 320px;
-      min-height: 200px;
-      margin: 0;
-      padding: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f8f9fa;
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'amazon-teal': '#007185',
+            'amazon-teal-dark': '#005a6b',
+          }
+        }
+      }
     }
-    
-    .header {
-      text-align: center;
-      margin-bottom: 16px;
-    }
-    
-    .header h1 {
-      margin: 0;
-      font-size: 18px;
-      color: #007185;
-    }
-    
-    .stats {
-      background: white;
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 16px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .stat-item {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 14px;
-    }
-    
-    .stat-value {
-      font-weight: bold;
-      color: #007185;
-    }
-    
-    .actions {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    
-    button {
-      background: #007185;
-      color: white;
-      border: none;
-      padding: 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: background-color 0.2s;
-    }
-    
-    button:hover {
-      background: #005a6b;
-    }
-    
-    button.danger {
-      background: #dc3545;
-    }
-    
-    button.danger:hover {
-      background: #c82333;
-    }
-    
-    .shortcuts {
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #ddd;
-      font-size: 12px;
-      color: #666;
-    }
-    
-    .shortcut {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 4px;
-    }
-    
-    .key {
-      background: #e9ecef;
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-family: monospace;
-    }
-  </style>
+  </script>
 </head>
-<body>
-  <div class="header">
-    <h1>🍇 Vine Enhancer</h1>
+<body class="w-80 min-h-[200px] m-0 p-4 font-sans bg-gray-50">
+  <div class="text-center mb-4">
+    <h1 class="m-0 text-lg text-amazon-teal font-medium">🍇 Vine Enhancer</h1>
   </div>
   
-  <div class="stats">
-    <div class="stat-item">
+  <div class="bg-white rounded-lg p-4 mb-4 shadow-sm">
+    <div class="flex justify-between mb-2 text-sm">
       <span>Items Seen:</span>
-      <span class="stat-value" id="seen-count">-</span>
+      <span class="font-bold text-amazon-teal" id="seen-count">-</span>
     </div>
-    <div class="stat-item">
+    <div class="flex justify-between mb-2 text-sm">
       <span>Active Since:</span>
-      <span class="stat-value" id="install-date">-</span>
+      <span class="font-bold text-amazon-teal" id="install-date">-</span>
     </div>
-    <div class="stat-item">
+    <div class="flex justify-between mb-2 text-sm">
       <span>Current Page:</span>
-      <span class="stat-value" id="current-page">-</span>
+      <span class="font-bold text-amazon-teal" id="current-page">-</span>
     </div>
   </div>
   
-  <div class="actions">
-    <button id="export-data">📥 Export Seen Items</button>
-    <button id="import-data">📤 Import Seen Items</button>
-    <button id="clear-all" class="danger">🗑️ Clear All Data</button>
+  <div class="flex flex-col gap-2">
+    <button id="export-data" class="bg-amazon-teal text-white border-none p-3 rounded-md cursor-pointer text-sm font-medium transition-colors duration-200 hover:bg-amazon-teal-dark">
+      📥 Export Seen Items
+    </button>
+    <button id="import-data" class="bg-amazon-teal text-white border-none p-3 rounded-md cursor-pointer text-sm font-medium transition-colors duration-200 hover:bg-amazon-teal-dark">
+      📤 Import Seen Items
+    </button>
+    <button id="clear-all" class="bg-red-600 text-white border-none p-3 rounded-md cursor-pointer text-sm font-medium transition-colors duration-200 hover:bg-red-700">
+      🗑️ Clear All Data
+    </button>
   </div>
   
-  <div class="shortcuts">
-    <h3>Keyboard Shortcuts:</h3>
-    <div class="shortcut">
+  <div class="mt-4 pt-4 border-t border-gray-300 text-xs text-gray-600">
+    <h3 class="text-sm font-medium mb-2 text-gray-800">Keyboard Shortcuts:</h3>
+    <div class="flex justify-between mb-1">
       <span>Navigate Items:</span>
-      <span><span class="key">J</span> / <span class="key">K</span></span>
+      <span>
+        <span class="bg-gray-200 px-1.5 py-0.5 rounded text-xs font-mono">J</span> / 
+        <span class="bg-gray-200 px-1.5 py-0.5 rounded text-xs font-mono">K</span>
+      </span>
     </div>
-    <div class="shortcut">
+    <div class="flex justify-between mb-1">
       <span>Hide Current:</span>
-      <span><span class="key">H</span></span>
+      <span>
+        <span class="bg-gray-200 px-1.5 py-0.5 rounded text-xs font-mono">H</span>
+      </span>
     </div>
-    <div class="shortcut">
-      <span>Toggle Titles:</span>
-      <span><span class="key">Space</span></span>
-    </div>
-    <div class="shortcut">
+    <div class="flex justify-between mb-1">
       <span>Navigate Pages:</span>
-      <span><span class="key">Ctrl</span> + <span class="key">←</span>/<span class="key">→</span></span>
+      <span>
+        <span class="bg-gray-200 px-1.5 py-0.5 rounded text-xs font-mono">Ctrl</span> + 
+        <span class="bg-gray-200 px-1.5 py-0.5 rounded text-xs font-mono">←</span>/<span class="bg-gray-200 px-1.5 py-0.5 rounded text-xs font-mono">→</span>
+      </span>
     </div>
-    <div class="shortcut">
+    <div class="flex justify-between mb-1">
       <span>Clear Filter:</span>
-      <span><span class="key">Esc</span></span>
+      <span>
+        <span class="bg-gray-200 px-1.5 py-0.5 rounded text-xs font-mono">Esc</span>
+      </span>
     </div>
   </div>
   
