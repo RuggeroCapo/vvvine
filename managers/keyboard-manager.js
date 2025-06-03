@@ -17,6 +17,8 @@ class KeyboardManager extends BaseManager {
     // Define keyboard shortcuts
     this.keyHandlers.set('a', this.handleToggleAutoNavigation.bind(this));
     this.keyHandlers.set('A', this.handleToggleAutoNavigation.bind(this));
+    this.keyHandlers.set('b', this.handleToggleBookmarkSidebar.bind(this));
+    this.keyHandlers.set('B', this.handleToggleBookmarkSidebar.bind(this));
     this.keyHandlers.set('Escape', this.handleEscapeKey.bind(this));
     this.keyHandlers.set('ArrowLeft', this.handleLeftArrowKey.bind(this));
     this.keyHandlers.set('ArrowRight', this.handleRightArrowKey.bind(this));
@@ -50,6 +52,10 @@ class KeyboardManager extends BaseManager {
         e.preventDefault();
         this.handleToggleAutoNavigation(e);
         break;
+      case 'KeyB':
+        e.preventDefault();
+        this.handleToggleBookmarkSidebar(e);
+        break;
       case 'ArrowLeft':
         if (e.ctrlKey) {
           e.preventDefault();
@@ -76,18 +82,28 @@ class KeyboardManager extends BaseManager {
   }
 
   // Key handler methods
-  handleToggleAutoNavigation(e) {
+  async handleToggleAutoNavigation(e) {
     // Toggle auto-navigation through the page manager
     if (window.vinePageManager) {
       const pageInfo = window.vinePageManager.getPageInfo();
-      if (pageInfo.autoNavigationEnabled) {
-        window.vinePageManager.disableAutoNavigation();
-        console.log('KeyboardManager: Auto-navigation disabled via keyboard shortcut');
-        this.showAutoNavigationStatus('Auto-navigation disabled', '#ff6b6b');
-      } else {
+      const newState = !pageInfo.autoNavigationEnabled;
+      
+      if (newState) {
         window.vinePageManager.enableAutoNavigation();
         console.log('KeyboardManager: Auto-navigation enabled via keyboard shortcut');
         this.showAutoNavigationStatus('Auto-navigation enabled', '#51cf66');
+      } else {
+        window.vinePageManager.disableAutoNavigation();
+        console.log('KeyboardManager: Auto-navigation disabled via keyboard shortcut');
+        this.showAutoNavigationStatus('Auto-navigation disabled', '#ff6b6b');
+      }
+      
+      // Persist the setting to storage
+      try {
+        await chrome.storage.local.set({ vineAutoNavigationEnabled: newState });
+        console.log(`KeyboardManager: Auto-navigation setting persisted: ${newState}`);
+      } catch (error) {
+        console.error('KeyboardManager: Error persisting auto-navigation setting:', error);
       }
     }
   }
@@ -146,6 +162,12 @@ class KeyboardManager extends BaseManager {
     if (e.ctrlKey) {
       this.navigatePages(1);
     }
+  }
+
+  handleToggleBookmarkSidebar(e) {
+    // Toggle bookmark sidebar
+    this.emit('toggleBookmarkSidebar');
+    console.log('KeyboardManager: Bookmark sidebar toggled via keyboard shortcut');
   }
 
   handleEscapeKey(e) {

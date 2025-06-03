@@ -6,7 +6,45 @@ class AmazonVineEnhancer {
     this.managers = {};
     this.isInitialized = false;
     
+    this.setupMessageListener();
     this.init();
+  }
+
+  setupMessageListener() {
+    // Listen for messages from popup
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+      if (request.action === 'toggleAutoNavigation') {
+        this.handleAutoNavigationToggle(request.enabled);
+        sendResponse({ success: true });
+      } else if (request.action === 'clearFilter') {
+        this.handleClearFilter();
+        sendResponse({ success: true });
+      }
+      return true; // Keep message channel open for async response
+    });
+  }
+
+  handleAutoNavigationToggle(enabled) {
+    const pageManager = this.managers.page;
+    if (pageManager) {
+      if (enabled) {
+        pageManager.enableAutoNavigation();
+        console.log('Auto-navigation enabled via popup');
+      } else {
+        pageManager.disableAutoNavigation();
+        console.log('Auto-navigation disabled via popup');
+      }
+    }
+  }
+
+  handleClearFilter() {
+    const filterManager = this.managers.filter;
+    const uiManager = this.managers.ui;
+    if (filterManager && uiManager) {
+      filterManager.clearFilter();
+      uiManager.clearFilter();
+      console.log('Search filter cleared via popup');
+    }
   }
 
   async init() {
@@ -52,6 +90,7 @@ class AmazonVineEnhancer {
     this.managers.storage = new StorageManager();
     this.managers.filter = new FilterManager();
     this.managers.seenItems = new SeenItemsManager();
+    this.managers.bookmarks = new BookmarkManager();
     this.managers.ui = new UIManager();
     this.managers.keyboard = new KeyboardManager();
     this.managers.page = new PageManager();
@@ -74,25 +113,33 @@ class AmazonVineEnhancer {
   setupManagerCommunication() {
     // Setup dependencies between managers
     this.managers.seenItems.setStorageManager(this.managers.storage);
+    this.managers.bookmarks.setStorageManager(this.managers.storage);
     
     // Special keyboard manager event handling for seen items
     window.vineEventBus.on('toggleItemSeen', (data) => {
       this.managers.seenItems.toggleItemSeen(data.title, data.item);
+    });
+
+    // Special keyboard manager event handling for bookmarks
+    window.vineEventBus.on('toggleItemBookmark', (data) => {
+      this.managers.bookmarks.toggleItemBookmark(data.title, data.url, data.pageNumber, data.pageUrl, data.item);
     });
     
     // Expose some managers globally for advanced usage
     window.vinePageManager = this.managers.page;
     window.vineKeyboardManager = this.managers.keyboard;
     window.vineStorageManager = this.managers.storage;
+    window.vineBookmarkManager = this.managers.bookmarks;
   }
 
   async startManagers() {
     // Initialize managers in the correct order
     const initOrder = [
-      'storage',    // Must be first to load seen items
+      'storage',    // Must be first to load seen items and bookmarks
       'title',      // Independent
       'filter',     // Independent  
       'seenItems',  // Depends on storage
+      'bookmarks',  // Depends on storage
       'ui',         // Needs to be available for status updates
       'keyboard',   // Coordinates with other managers
       'page'        // Independent
@@ -105,15 +152,35 @@ class AmazonVineEnhancer {
           await manager.init();
           console.log(`✓ ${managerName} manager initialized`);
           
-          // Enable auto-navigation after page manager is initialized
+          // Check auto-navigation setting after page manager is initialized
           if (managerName === 'page') {
-            manager.enableAutoNavigation();
-            console.log('✓ Auto-navigation enabled for infinite scroll');
+            await this.initializeAutoNavigation(manager);
           }
         } catch (error) {
           console.error(`✗ Failed to initialize ${managerName} manager:`, error);
         }
       }
+    }
+  }
+
+  async initializeAutoNavigation(pageManager) {
+    try {
+      // Check if auto-navigation is enabled in storage
+      const result = await chrome.storage.local.get(['vineAutoNavigationEnabled']);
+      const autoNavigationEnabled = result.vineAutoNavigationEnabled !== false; // Default to true
+      
+      if (autoNavigationEnabled) {
+        pageManager.enableAutoNavigation();
+        console.log('✓ Auto-navigation enabled for infinite scroll');
+      } else {
+        pageManager.disableAutoNavigation();
+        console.log('✓ Auto-navigation disabled by user setting');
+      }
+    } catch (error) {
+      console.error('Error checking auto-navigation setting:', error);
+      // Default to enabled if there's an error
+      pageManager.enableAutoNavigation();
+      console.log('✓ Auto-navigation enabled (default fallback)');
     }
   }
 
@@ -145,6 +212,7 @@ class AmazonVineEnhancer {
     delete window.vinePageManager;
     delete window.vineKeyboardManager;
     delete window.vineStorageManager;
+    delete window.vineBookmarkManager;
     
     this.managers = {};
     this.isInitialized = false;

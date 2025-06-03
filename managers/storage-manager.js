@@ -3,11 +3,13 @@ class StorageManager extends BaseManager {
   constructor(config) {
     super(config);
     this.seenItems = new Set();
+    this.bookmarks = new Map(); // Map of title -> {title, url, timestamp}
   }
 
   async setup() {
     await this.loadSeenItems();
-    console.log(`StorageManager: Loaded ${this.seenItems.size} seen items`);
+    await this.loadBookmarks();
+    console.log(`StorageManager: Loaded ${this.seenItems.size} seen items and ${this.bookmarks.size} bookmarks`);
   }
 
   async loadSeenItems() {
@@ -95,5 +97,90 @@ class StorageManager extends BaseManager {
 
   getSeenItemsArray() {
     return Array.from(this.seenItems);
+  }
+
+  // Bookmark management methods
+  async loadBookmarks() {
+    try {
+      const result = await chrome.storage.local.get(['vineBookmarks']);
+      const bookmarkArray = result.vineBookmarks || [];
+      this.bookmarks = new Map(bookmarkArray.map(bookmark => [bookmark.title, bookmark]));
+      this.emit('bookmarksLoaded', { bookmarks: this.bookmarks });
+      return this.bookmarks;
+    } catch (error) {
+      console.error('StorageManager: Error loading bookmarks:', error);
+      throw error;
+    }
+  }
+
+  async saveBookmarks() {
+    try {
+      const bookmarkArray = Array.from(this.bookmarks.values());
+      await chrome.storage.local.set({
+        vineBookmarks: bookmarkArray
+      });
+      this.emit('bookmarksSaved', { bookmarks: this.bookmarks });
+    } catch (error) {
+      console.error('StorageManager: Error saving bookmarks:', error);
+      throw error;
+    }
+  }
+
+  addBookmark(title, url, pageNumber = 1, pageUrl = '') {
+    if (!this.bookmarks.has(title)) {
+      const bookmark = {
+        title: title,
+        url: url,
+        pageNumber: pageNumber,
+        pageUrl: pageUrl,
+        timestamp: Date.now()
+      };
+      this.bookmarks.set(title, bookmark);
+      this.saveBookmarks();
+      this.emit('itemBookmarked', { title, url, pageNumber, pageUrl, bookmark, bookmarks: this.bookmarks });
+      return true;
+    }
+    return false;
+  }
+
+  removeBookmark(title) {
+    if (this.bookmarks.has(title)) {
+      const bookmark = this.bookmarks.get(title);
+      this.bookmarks.delete(title);
+      this.saveBookmarks();
+      this.emit('itemUnbookmarked', { title, bookmark, bookmarks: this.bookmarks });
+      return true;
+    }
+    return false;
+  }
+
+  isItemBookmarked(title) {
+    return this.bookmarks.has(title);
+  }
+
+  toggleBookmark(title, url, pageNumber = 1, pageUrl = '') {
+    if (this.isItemBookmarked(title)) {
+      return this.removeBookmark(title);
+    } else {
+      return this.addBookmark(title, url, pageNumber, pageUrl);
+    }
+  }
+
+  clearAllBookmarks() {
+    this.bookmarks.clear();
+    this.saveBookmarks();
+    this.emit('allBookmarksCleared', { bookmarks: this.bookmarks });
+  }
+
+  getBookmarksCount() {
+    return this.bookmarks.size;
+  }
+
+  getBookmarksArray() {
+    return Array.from(this.bookmarks.values()).sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  getBookmark(title) {
+    return this.bookmarks.get(title);
   }
 } 

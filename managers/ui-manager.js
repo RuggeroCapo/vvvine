@@ -33,6 +33,7 @@ class UIManager extends BaseManager {
           </label>
         </div>
         <button id="clear-seen" title="Clear All Seen Items">🗑️ Clear Seen</button>
+        <button id="toggle-bookmarks" title="Toggle Bookmarks Sidebar">📚 Bookmarks</button>
         <input type="text" id="filter-input" placeholder="Filter products..." title="Filter current page">
         <span id="status-info">Page ${this.currentPage} | Loading...</span>
       </div>
@@ -134,6 +135,11 @@ class UIManager extends BaseManager {
       }
     });
 
+    // Toggle bookmarks sidebar
+    document.getElementById('toggle-bookmarks').addEventListener('click', () => {
+      this.emit('toggleBookmarkSidebar');
+    });
+
     // Filter input
     const filterInput = document.getElementById('filter-input');
     filterInput.addEventListener('input', (e) => {
@@ -195,6 +201,10 @@ class UIManager extends BaseManager {
 
     this.on('allSeenItemsCleared', (data) => {
       this.updateStatusInfo(data.seenItems.size);
+    });
+
+    this.on('filterLoaded', (data) => {
+      this.restoreFilterInput(data.query);
     });
 
     this.on('itemsFiltered', (data) => {
@@ -267,6 +277,15 @@ class UIManager extends BaseManager {
     if (filterInput) {
       filterInput.value = '';
       this.emit('filterItems', { query: '' });
+    }
+  }
+
+  // Restore filter input value from stored query
+  restoreFilterInput(query) {
+    const filterInput = document.getElementById('filter-input');
+    if (filterInput && query) {
+      filterInput.value = query;
+      console.log(`UIManager: Restored filter input: "${query}"`);
     }
   }
 

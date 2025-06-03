@@ -37,6 +37,14 @@ A Chrome extension designed to dramatically improve your efficiency when browsin
 - Visual indicator shows auto-navigation status
 - Toggle on/off with **A** key or enabled by default
 
+### 📚 **Bookmark System**
+- Bookmark interesting items for later review
+- Stores item title, URL, and page location
+- Slide-out sidebar showing all bookmarked items
+- Two navigation options: visit item directly or return to the page where you found it
+- Persistent storage across browser sessions
+- Visual indicators for bookmarked items
+
 ### 📊 **Smart Interface**
 - Sticky control panel with quick actions
 - Real-time statistics (page info, seen count, visible items)
@@ -80,6 +88,7 @@ A Chrome extension designed to dramatically improve your efficiency when browsin
 - **👁️ Mark All Seen**: Mark all products on current page as seen
 - **🙈 Toggle Seen**: Hide/show previously seen items
 - **🗑️ Clear Seen**: Remove all seen items from memory
+- **📚 Bookmarks**: Open/close bookmark sidebar
 - **Filter Box**: Type to search within current page products
 
 ### Keyboard Shortcuts
@@ -90,6 +99,7 @@ Navigate efficiently without touching your mouse:
 | `J` | Move to next item |
 | `K` | Move to previous item |
 | `H` | Hide/mark current item as seen |
+| `B` | Toggle bookmark sidebar |
 | `A` | Toggle auto-navigation (infinite scroll) |
 | `Space` | Toggle title expansion |
 | `Ctrl + ←` | Previous page |
@@ -97,7 +107,8 @@ Navigate efficiently without touching your mouse:
 | `Esc` | Clear search filter |
 
 ### Visual Indicators
-- **Seen Items**: Dimmed with green "✓ SEEN" badge
+- **Seen Items**: Dimmed with green border and 👁️ icon
+- **Bookmarked Items**: Orange border and 📚 icon
 - **Current Item**: Orange outline when using keyboard navigation
 - **Search Matches**: Highlighted in yellow when filtering
 
@@ -182,6 +193,13 @@ cd topvine
 ```
 
 ## 📝 Changelog
+
+### Version 1.2.0
+- ✅ Bookmark system with page tracking
+- ✅ Slide-out sidebar for bookmark management
+- ✅ Two navigation options: visit item or return to page
+- ✅ Page number tracking for bookmarked items
+- ✅ Keyboard shortcut (B) to toggle bookmark sidebar
 
 ### Version 1.1.0
 - ✅ Auto-navigation (infinite scroll) functionality

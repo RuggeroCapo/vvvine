@@ -8,7 +8,28 @@ class FilterManager extends BaseManager {
 
   async setup() {
     this.setupEventListeners();
+    await this.loadStoredFilter();
     console.log('FilterManager: Initialized');
+  }
+
+  async loadStoredFilter() {
+    try {
+      const result = await chrome.storage.local.get(['vineSearchQuery']);
+      const storedQuery = result.vineSearchQuery || '';
+      
+      if (storedQuery) {
+        this.currentFilter = storedQuery;
+        console.log(`FilterManager: Loaded stored filter: "${storedQuery}"`);
+        
+        // Apply the filter after a short delay to ensure DOM is ready
+        setTimeout(() => {
+          this.filterItems(storedQuery);
+          this.emit('filterLoaded', { query: storedQuery });
+        }, 100);
+      }
+    } catch (error) {
+      console.error('FilterManager: Error loading stored filter:', error);
+    }
   }
 
   setupEventListeners() {
@@ -21,10 +42,17 @@ class FilterManager extends BaseManager {
     });
   }
 
-  filterItems(query) {
+  async filterItems(query) {
     const items = document.querySelectorAll('.vvp-item-tile');
     const lowerQuery = query.toLowerCase().trim();
     this.currentFilter = query;
+    
+    // Save the query to storage for persistence across pages
+    try {
+      await chrome.storage.local.set({ vineSearchQuery: query });
+    } catch (error) {
+      console.error('FilterManager: Error saving search query:', error);
+    }
     
     let visibleCount = 0;
     let filteredCount = 0;
@@ -94,8 +122,8 @@ class FilterManager extends BaseManager {
     });
   }
 
-  clearFilter() {
-    this.filterItems('');
+  async clearFilter() {
+    await this.filterItems('');
   }
 
   getCurrentFilter() {
@@ -164,9 +192,16 @@ class FilterManager extends BaseManager {
   }
 
   // Reset all filters and show all items
-  resetAllFilters() {
+  async resetAllFilters() {
     this.currentFilter = '';
     this.filteredItems.clear();
+    
+    // Clear stored query
+    try {
+      await chrome.storage.local.remove(['vineSearchQuery']);
+    } catch (error) {
+      console.error('FilterManager: Error clearing stored search query:', error);
+    }
     
     const items = document.querySelectorAll('.vvp-item-tile');
     items.forEach(item => {

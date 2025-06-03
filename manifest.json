@@ -34,6 +34,7 @@
         "managers/storage-manager.js",
         "managers/ui-manager.js",
         "managers/seen-items-manager.js",
+        "managers/bookmark-manager.js",
         "managers/filter-manager.js",
         "managers/keyboard-manager.js",
         "managers/page-manager.js",
