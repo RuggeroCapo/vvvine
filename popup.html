@@ -3,284 +3,262 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Amazon Vine Efficiency Enhancer</title>
-  <style>
-    /* Popup-specific styles */
-    body {
-      width: 320px;
-      min-height: 200px;
-      margin: 0;
-      padding: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background-color: #f9fafb;
-    }
-    
-    .popup-container {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-    
-    .popup-header {
-      text-align: center;
-    }
-    
-    .popup-title {
-      margin: 0;
-      font-size: 18px;
-      color: #007185;
-      font-weight: 500;
-    }
-    
-    .stats-card, .settings-card {
-      background: white;
-      border-radius: 8px;
-      padding: 16px;
-      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    }
-    
-    .stat-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 14px;
-    }
-    
-    .stat-row:last-child {
-      margin-bottom: 0;
-    }
-    
-    .stat-value {
-      font-weight: 700;
-      color: #007185;
-    }
-    
-    .search-filter-value {
-      font-size: 12px;
-    }
-    
-    .toggle-container {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .toggle-info h3 {
-      margin: 0;
-      font-size: 14px;
-      font-weight: 500;
-      color: #1f2937;
-    }
-    
-    .toggle-info p {
-      margin: 0;
-      font-size: 12px;
-      color: #6b7280;
-    }
-    
-    .toggle-switch {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      cursor: pointer;
-    }
-    
-    .toggle-input {
-      position: absolute;
-      opacity: 0;
-      pointer-events: none;
-    }
-    
-    .toggle-slider {
-      width: 44px;
-      height: 24px;
-      background-color: #e5e7eb;
-      border-radius: 12px;
-      position: relative;
-      transition: background-color 0.2s ease;
-    }
-    
-    .toggle-slider::after {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 20px;
-      height: 20px;
-      background-color: white;
-      border-radius: 50%;
-      transition: transform 0.2s ease;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-    
-    .toggle-input:checked + .toggle-slider {
-      background-color: #007185;
-    }
-    
-    .toggle-input:checked + .toggle-slider::after {
-      transform: translateX(20px);
-    }
-    
-    .button-group {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    
-    .btn {
-      border: none;
-      padding: 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.2s ease;
-      text-align: center;
-    }
-    
-    .btn-primary {
-      background-color: #007185;
-      color: white;
-    }
-    
-    .btn-primary:hover {
-      background-color: #005a6b;
-    }
-    
-    .btn-orange {
-      background-color: #ea580c;
-      color: white;
-    }
-    
-    .btn-orange:hover {
-      background-color: #c2410c;
-    }
-    
-    .btn-red {
-      background-color: #dc2626;
-      color: white;
-    }
-    
-    .btn-red:hover {
-      background-color: #b91c1c;
-    }
-    
-    .shortcuts-section {
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px solid #d1d5db;
-      font-size: 12px;
-      color: #6b7280;
-    }
-    
-    .shortcuts-title {
-      font-size: 14px;
-      font-weight: 500;
-      margin-bottom: 8px;
-      color: #1f2937;
-    }
-    
-    .shortcut-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 4px;
-    }
-    
-    .shortcut-row:last-child {
-      margin-bottom: 0;
-    }
-    
-    .kbd {
-      background-color: #e5e7eb;
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-size: 11px;
-      font-family: monospace;
-    }
-  </style>
+  <title>Vine Enhancer</title>
+  <link rel="stylesheet" href="popup-styles.css">
 </head>
 <body>
   <div class="popup-container">
+    <!-- Header -->
     <div class="popup-header">
       <h1 class="popup-title">🍇 Vine Enhancer</h1>
+      <p class="popup-subtitle">Amazon Vine Productivity Tool</p>
     </div>
-    
-    <div class="stats-card">
-      <div class="stat-row">
-        <span>Items Seen:</span>
-        <span class="stat-value" id="seen-count">-</span>
+
+    <!-- Statistics Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">📊</div>
+        <h2 class="card-title">Statistics</h2>
       </div>
-      <div class="stat-row">
-        <span>Active Since:</span>
-        <span class="stat-value" id="install-date">-</span>
-      </div>
-      <div class="stat-row">
-        <span>Current Page:</span>
-        <span class="stat-value" id="current-page">-</span>
-      </div>
-      <div class="stat-row">
-        <span>Search Filter:</span>
-        <span class="stat-value search-filter-value" id="search-filter">None</span>
-      </div>
-    </div>
-    
-    <div class="settings-card">
-      <div class="toggle-container">
-        <div class="toggle-info">
-          <h3>Auto-Navigation</h3>
-          <p>Automatically navigate to next page</p>
+      <div class="card-content">
+        <div class="stat-row">
+          <span class="stat-label">
+            <span class="stat-label-icon">👁️</span>
+            Items Seen
+          </span>
+          <span class="stat-value" id="seen-count">-</span>
         </div>
-        <label class="toggle-switch">
-          <input type="checkbox" id="auto-navigation-toggle" class="toggle-input">
-          <div class="toggle-slider"></div>
-        </label>
+        <div class="stat-row">
+          <span class="stat-label">
+            <span class="stat-label-icon">📦</span>
+            Items Tracked
+          </span>
+          <span class="stat-value" id="known-items-count">-</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">
+            <span class="stat-label-icon">📅</span>
+            Active Since
+          </span>
+          <span class="stat-value" id="install-date">-</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">
+            <span class="stat-label-icon">📄</span>
+            Current Page
+          </span>
+          <span class="stat-value" id="current-page">-</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">
+            <span class="stat-label-icon">🔍</span>
+            Search Filter
+          </span>
+          <span class="stat-value search-filter-value" id="search-filter" title="">None</span>
+        </div>
       </div>
     </div>
-    
-    <div class="button-group">
-      <button id="export-data" class="btn btn-primary">
-        📥 Export Seen Items
-      </button>
-      <button id="import-data" class="btn btn-primary">
-        📤 Import Seen Items
-      </button>
-      <button id="clear-filter" class="btn btn-orange">
-        🔍 Clear Search Filter
-      </button>
-      <button id="clear-all" class="btn btn-red">
-        🗑️ Clear All Data
-      </button>
+
+    <!-- Auto-Navigation Card -->
+    <div class="card">
+      <div class="card-content">
+        <div class="toggle-container">
+          <div class="toggle-info">
+            <h3>Auto-Navigation</h3>
+            <p>Automatically navigate to next page</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="auto-navigation-toggle" class="toggle-input">
+            <div class="toggle-slider"></div>
+          </label>
+        </div>
+      </div>
     </div>
-    
-    <div class="shortcuts-section">
-      <h3 class="shortcuts-title">Keyboard Shortcuts:</h3>
-      <div class="shortcut-row">
-        <span>Navigate Items:</span>
-        <span>
-          <span class="kbd">J</span> / <span class="kbd">K</span>
-        </span>
+
+    <!-- Monitoring Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🔔</div>
+        <h2 class="card-title">Monitoring Mode</h2>
       </div>
-      <div class="shortcut-row">
-        <span>Hide Current:</span>
-        <span><span class="kbd">H</span></span>
+      <div class="card-content">
+        <p class="card-description">Monitor for new items with notifications</p>
+
+        <!-- Queue Selection -->
+        <div class="form-group">
+          <label class="form-label">Queue to Monitor</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="monitor-queue" value="potluck" id="monitor-potluck" checked class="radio-input">
+              <span>Potluck</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="monitor-queue" value="encore" id="monitor-encore" class="radio-input">
+              <span>Encore</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="monitor-queue" value="last_chance" id="monitor-last-chance" class="radio-input">
+              <span>Last Chance</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="monitor-queue" value="search" id="monitor-search" class="radio-input">
+              <span>Search</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Search Query -->
+        <div id="search-query-container" class="form-group" style="display: none;">
+          <label class="form-label" for="monitoring-search-query">Search Query</label>
+          <input type="text" id="monitoring-search-query" placeholder="e.g., headphones, gaming" class="text-input">
+        </div>
+
+        <!-- Refresh Interval -->
+        <div class="form-group">
+          <label class="form-label">
+            <span>Refresh Interval</span>
+            <span class="form-label-value" id="refresh-interval-display">5min</span>
+          </label>
+          <input type="range" id="refresh-interval" min="60" max="1800" value="300" step="60" class="range-input">
+          <div class="range-labels">
+            <span>1min</span>
+            <span>30min</span>
+          </div>
+        </div>
+
+        <!-- Start/Stop Button -->
+        <button id="toggle-monitoring-btn" class="btn btn-primary">
+          <span class="btn-icon">▶️</span>
+          Start Monitoring
+        </button>
+
+        <!-- Monitoring Status -->
+        <div id="monitoring-status" class="monitoring-status" style="display: none;">
+          <div class="status-grid">
+            <div class="status-item">
+              <span class="status-label">Status</span>
+              <span id="monitoring-status-text" class="status-badge status-active">● Active</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Monitoring</span>
+              <span id="monitoring-queue-text" class="status-value">Potluck</span>
+            </div>
+            <div class="status-item">
+              <span class="status-label">Items Notified</span>
+              <span id="monitoring-notified-count" class="status-value">0</span>
+            </div>
+          </div>
+          <div class="button-row">
+            <button id="test-notification" class="btn btn-small btn-primary">
+              <span class="btn-icon">🔔</span>
+              Test
+            </button>
+            <button id="clear-notified" class="btn btn-small btn-orange">
+              <span class="btn-icon">🗑️</span>
+              Clear
+            </button>
+          </div>
+        </div>
       </div>
-      <div class="shortcut-row">
-        <span>Navigate Pages:</span>
-        <span>
-          <span class="kbd">Ctrl</span> + <span class="kbd">←</span>/<span class="kbd">→</span>
-        </span>
+    </div>
+
+    <!-- Telegram Settings Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">📱</div>
+        <h2 class="card-title">Telegram Notifications</h2>
       </div>
-      <div class="shortcut-row">
-        <span>Clear Filter:</span>
-        <span><span class="kbd">Esc</span></span>
+      <div class="card-content">
+        <p class="card-description">Configure Telegram bot for notifications</p>
+        <div class="form-group">
+          <label class="form-label" for="telegram-bot-token">Bot Token</label>
+          <input type="password" id="telegram-bot-token" placeholder="123456:ABC-DEF..." class="text-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="telegram-chat-id">Chat ID</label>
+          <input type="text" id="telegram-chat-id" placeholder="-1001234567890" class="text-input">
+        </div>
+        <div class="button-row">
+          <button id="save-telegram-config" class="btn btn-small btn-primary">
+            <span class="btn-icon">💾</span>
+            Save
+          </button>
+          <button id="test-telegram" class="btn btn-small btn-primary">
+            <span class="btn-icon">🧪</span>
+            Test
+          </button>
+        </div>
+        <div id="telegram-status" class="telegram-status" style="display: none;"></div>
       </div>
-      <div class="shortcut-row">
-        <span>Toggle Auto-Nav:</span>
-        <span><span class="kbd">A</span></span>
+    </div>
+
+    <!-- Actions Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">⚙️</div>
+        <h2 class="card-title">Actions</h2>
+      </div>
+      <div class="card-content">
+        <div class="button-group">
+          <button id="export-data" class="btn btn-primary">
+            <span class="btn-icon">📥</span>
+            Export Seen Items
+          </button>
+          <button id="import-data" class="btn btn-primary">
+            <span class="btn-icon">📤</span>
+            Import Seen Items
+          </button>
+          <button id="clear-filter" class="btn btn-orange">
+            <span class="btn-icon">🔍</span>
+            Clear Search Filter
+          </button>
+          <button id="reset-category-counts" class="btn btn-orange">
+            <span class="btn-icon">🔄</span>
+            Reset Category Counts
+          </button>
+          <button id="clear-all" class="btn btn-red">
+            <span class="btn-icon">🗑️</span>
+            Clear All Data
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">⌨️</div>
+        <h2 class="card-title">Keyboard Shortcuts</h2>
+      </div>
+      <div class="card-content">
+        <div class="shortcut-row">
+          <span class="shortcut-label">Navigate Items</span>
+          <span class="shortcut-keys">
+            <kbd>J</kbd> / <kbd>K</kbd>
+          </span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-label">Hide Current</span>
+          <span class="shortcut-keys"><kbd>H</kbd></span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-label">Navigate Pages</span>
+          <span class="shortcut-keys">
+            <kbd>Ctrl</kbd> + <kbd>←</kbd>/<kbd>→</kbd>
+          </span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-label">Clear Filter</span>
+          <span class="shortcut-keys"><kbd>Esc</kbd></span>
+        </div>
+        <div class="shortcut-row">
+          <span class="shortcut-label">Toggle Auto-Nav</span>
+          <span class="shortcut-keys"><kbd>A</kbd></span>
+        </div>
       </div>
     </div>
   </div>
-  
+
   <script src="popup.js"></script>
 </body>
-</html> 
+</html>

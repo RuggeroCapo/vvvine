@@ -64,6 +64,16 @@
 - **Efficiency Impact**: Continuous browsing without interruption
 - **Status**: 🔄 FRAMEWORK IN PLACE (can be enhanced)
 
+### 6. New Items Highlighting ✅
+- **Purpose**: Instantly identify items that have never been seen before
+- **Implementation**:
+  - Track all encountered ASINs with timestamps in `vineKnownItems` storage
+  - Automatic garbage collection removes items not seen for 30 days
+  - Blue glow animation and "✨ NEW" badge for new items
+  - Real-time detection on page load and infinite scroll
+- **Efficiency Impact**: Immediate focus on genuinely new products
+- **Status**: ✅ COMPLETED
+
 ## 🎉 COMPLETION STATUS
 
 ### ✅ COMPLETED FEATURES
@@ -72,16 +82,18 @@
 3. **Mark as Seen System** - Persistent storage, visual indicators, bulk operations
 4. **Client-Side Filtering** - Real-time search, instant results
 5. **Keyboard Navigation** - Full vim-style navigation, page jumping
-6. **Data Management** - Export/import, statistics, cleanup
-7. **User Interface** - Control panel, popup, visual feedback
-8. **Performance Optimization** - Efficient storage, minimal DOM impact
+6. **New Items Highlighting** - Automatic detection and visual highlighting of never-before-seen items
+7. **Data Management** - Export/import, statistics, cleanup
+8. **User Interface** - Control panel, popup, visual feedback
+9. **Performance Optimization** - Efficient storage, minimal DOM impact
 
 ### 📁 FILES CREATED
 - `manifest.json` - Extension configuration
 - `content.js` - Main functionality (370+ lines)
-- `styles.css` - Complete styling system
+- `styles.css` - Complete styling system including new items animations
 - `popup.html` - Statistics and data management interface
-- `popup.js` - Popup functionality
+- `popup.js` - Popup functionality with new items tracking
+- `managers/new-items-manager.js` - New items detection and highlighting system
 - `README.md` - Comprehensive documentation
 - `memory.mdx` - Project documentation and guidelines
 

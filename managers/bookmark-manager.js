@@ -12,7 +12,6 @@ class BookmarkManager extends BaseManager {
     await this.waitForElement('#vvp-items-grid');
     this.createSidebar();
     this.processAllItems();
-    console.log('BookmarkManager: Initialized and items processed');
   }
 
   setStorageManager(storageManager) {
@@ -257,8 +256,6 @@ class BookmarkManager extends BaseManager {
         processedCount++;
       }
     });
-
-    console.log(`BookmarkManager: Processed ${processedCount} new items`);
   }
 
   processItem(item) {
@@ -362,8 +359,6 @@ class BookmarkManager extends BaseManager {
       const button = item.querySelector('.vine-bookmark-btn');
       if (button) button.innerHTML = '📖';
     });
-
-    console.log(`BookmarkManager: Cleared visual states for ${bookmarkedItems.length} items`);
   }
 
   updateSidebar() {

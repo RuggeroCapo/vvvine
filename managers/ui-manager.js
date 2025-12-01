@@ -11,7 +11,6 @@ class UIManager extends BaseManager {
     this.createControlPanel();
     this.setupControlListeners();
     this.setupStatusUpdates();
-    console.log('UIManager: Interface created and ready');
   }
 
   getCurrentPageNumber() {
@@ -24,18 +23,51 @@ class UIManager extends BaseManager {
     this.controlPanel.id = 'vine-enhancer-panel';
     this.controlPanel.innerHTML = `
       <div class="vine-controls">
-        <button id="mark-all-seen" title="Mark All as Seen">👁️ Mark All Seen</button>
-        <div class="vine-slider-container">
-          <span class="vine-slider-label">Show Seen:</span>
-          <label class="vine-slider">
-            <input type="checkbox" id="show-seen-slider" title="Toggle visibility of seen items">
-            <span class="vine-slider-toggle"></span>
-          </label>
+        <div class="vine-control-group vine-control-group-actions">
+          <button id="mark-all-seen" title="Mark All as Seen">
+            <span class="vine-btn-icon">👁️</span>
+            <span class="vine-btn-text">Mark All</span>
+          </button>
+          <button id="clear-seen" title="Clear All Seen Items">
+            <span class="vine-btn-icon">🗑️</span>
+            <span class="vine-btn-text">Clear Seen</span>
+          </button>
         </div>
-        <button id="clear-seen" title="Clear All Seen Items">🗑️ Clear Seen</button>
-        <button id="toggle-bookmarks" title="Toggle Bookmarks Sidebar">📚 Bookmarks</button>
-        <input type="text" id="filter-input" placeholder="Filter products..." title="Filter current page">
-        <span id="status-info">Page ${this.currentPage} | Loading...</span>
+
+        <div class="vine-control-separator"></div>
+
+        <div class="vine-control-group vine-control-group-toggles">
+          <div class="vine-slider-container">
+            <span class="vine-slider-label">Show Seen</span>
+            <label class="vine-slider">
+              <input type="checkbox" id="show-seen-slider" title="Toggle visibility of seen items">
+              <span class="vine-slider-toggle"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="vine-control-separator"></div>
+
+        <div class="vine-control-group vine-control-group-view">
+          <button id="toggle-view" title="Toggle Card/Table View">
+            <span class="vine-btn-icon">📊</span>
+            <span class="vine-btn-text">Table</span>
+          </button>
+          <button id="toggle-bookmarks" title="Toggle Bookmarks Sidebar">
+            <span class="vine-btn-icon">📚</span>
+            <span class="vine-btn-text">Bookmarks</span>
+          </button>
+        </div>
+
+        <div class="vine-control-separator"></div>
+
+        <div class="vine-control-group vine-control-group-filter">
+          <input type="text" id="filter-input" placeholder="🔍 Filter products..." title="Filter current page">
+        </div>
+
+        <div class="vine-control-group vine-control-group-status">
+          <span id="status-info">Page ${this.currentPage} | Loading...</span>
+        </div>
       </div>
     `;
 
@@ -45,6 +77,12 @@ class UIManager extends BaseManager {
     
     // Add CSS for the slider
     this.addSliderStyles();
+    
+    // Initialize view mode
+    this.currentView = 'card'; // 'card' or 'table'
+    
+    // Set initial view state on body
+    document.body.setAttribute('data-vine-view', 'card');
   }
 
   addSliderStyles() {
@@ -140,6 +178,11 @@ class UIManager extends BaseManager {
       this.emit('toggleBookmarkSidebar');
     });
 
+    // Toggle view mode
+    document.getElementById('toggle-view').addEventListener('click', () => {
+      this.toggleView();
+    });
+
     // Filter input
     const filterInput = document.getElementById('filter-input');
     filterInput.addEventListener('input', (e) => {
@@ -184,23 +227,32 @@ class UIManager extends BaseManager {
   setupStatusUpdates() {
     // Listen for status updates from other managers
     this.on('seenItemsLoaded', (data) => {
-      this.updateStatusInfo(data.seenItems.size);
+      this.updateStatusInfo();
     });
 
     this.on('itemMarkedSeen', (data) => {
-      this.updateStatusInfo(data.seenItems.size);
+      this.updateStatusInfo();
     });
 
     this.on('itemMarkedUnseen', (data) => {
-      this.updateStatusInfo(data.seenItems.size);
+      this.updateStatusInfo();
     });
 
     this.on('multipleItemsMarkedSeen', (data) => {
-      this.updateStatusInfo(data.seenItems.size);
+      this.updateStatusInfo();
     });
 
     this.on('allSeenItemsCleared', (data) => {
-      this.updateStatusInfo(data.seenItems.size);
+      this.updateStatusInfo();
+    });
+
+    // Listen for new items updates
+    this.on('newItemsStatsUpdated', (data) => {
+      this.updateStatusInfo();
+    });
+
+    this.on('newItemsDetected', (data) => {
+      this.updateStatusInfo();
     });
 
     this.on('filterLoaded', (data) => {
@@ -208,28 +260,32 @@ class UIManager extends BaseManager {
     });
 
     this.on('itemsFiltered', (data) => {
-      this.updateStatusInfo(null, data.visibleCount);
+      this.updateStatusInfo();
+    });
+
+    // Listen for table row visibility updates
+    this.on('updateTableRowVisibility', (data) => {
+      this.updateTableRow(data.itemId, { visible: data.visible });
     });
   }
 
-  updateStatusInfo(seenCount = null, visibleCount = null) {
+  updateStatusInfo() {
     const statusElement = document.getElementById('status-info');
     if (!statusElement) return;
 
-    // Get current values if not provided
-    if (seenCount === null) {
-      seenCount = this.getCurrentSeenCount();
-    }
-    
-    if (visibleCount === null) {
-      visibleCount = this.getCurrentVisibleCount();
-    }
+    const seenCount = this.getCurrentSeenCount();
+    const newCount = this.getCurrentNewItemsCount();
+    const visibleCount = this.getCurrentVisibleCount();
 
-    statusElement.textContent = `Page ${this.currentPage} | ${seenCount} seen | ${visibleCount} visible`;
+    statusElement.textContent = `Page ${this.currentPage} | ${seenCount} seen | ${newCount} NEW | ${visibleCount} visible`;
   }
 
   getCurrentSeenCount() {
     return document.querySelectorAll('.vine-seen').length;
+  }
+
+  getCurrentNewItemsCount() {
+    return document.querySelectorAll('.vine-new-item').length;
   }
 
   getCurrentVisibleCount() {
@@ -285,7 +341,199 @@ class UIManager extends BaseManager {
     const filterInput = document.getElementById('filter-input');
     if (filterInput && query) {
       filterInput.value = query;
-      console.log(`UIManager: Restored filter input: "${query}"`);
+    }
+  }
+
+  toggleView() {
+    this.currentView = this.currentView === 'card' ? 'table' : 'card';
+    const button = document.getElementById('toggle-view');
+
+    // Set data attribute on body for CSS targeting
+    document.body.setAttribute('data-vine-view', this.currentView);
+
+    if (this.currentView === 'table') {
+      button.innerHTML = '<span class="vine-btn-icon">🃏</span><span class="vine-btn-text">Cards</span>';
+      this.showTableView();
+    } else {
+      button.innerHTML = '<span class="vine-btn-icon">📊</span><span class="vine-btn-text">Table</span>';
+      this.showCardView();
+    }
+  }
+
+  showTableView() {
+    const grid = document.getElementById('vvp-items-grid');
+    if (!grid) {
+      return;
+    }
+
+    // Create or show table container
+    let tableContainer = document.getElementById('vine-table-container');
+    if (!tableContainer) {
+      tableContainer = document.createElement('div');
+      tableContainer.id = 'vine-table-container';
+      tableContainer.className = 'vine-table-container';
+      grid.parentNode.insertBefore(tableContainer, grid.nextSibling);
+    }
+
+    // Build table from grid items
+    const items = Array.from(grid.querySelectorAll('.vvp-item-tile'));
+    
+    const tableHTML = this.buildTableHTML(items);
+    tableContainer.innerHTML = tableHTML;
+
+    // Attach event listeners to table actions
+    this.attachTableEventListeners(tableContainer);
+  }
+
+  showCardView() {
+    // CSS will handle the display via data-vine-view attribute
+  }
+
+  buildTableHTML(items) {
+    const rows = items.map(item => {
+      // Extract title and link
+      const titleElement = item.querySelector('.vvp-item-product-title-container a');
+      const title = titleElement?.textContent.trim() || 'N/A';
+      const link = titleElement?.href || '#';
+      
+      // Extract image
+      const image = item.querySelector('img')?.src || '';
+      
+      // Extract ETV - look for the tax value in the content
+      let etv = 'N/A';
+      const content = item.querySelector('.vvp-item-tile-content');
+      if (content) {
+        // Try to find ETV in various possible locations
+        const etvElement = content.querySelector('.a-size-base.a-color-secondary') || 
+                          content.querySelector('[class*="tax"]') ||
+                          Array.from(content.querySelectorAll('span')).find(span => 
+                            span.textContent.includes('$') || span.textContent.includes('ETV')
+                          );
+        if (etvElement) {
+          etv = etvElement.textContent.trim();
+        }
+      }
+      
+      // Get item states
+      const isSeen = item.classList.contains('vine-seen');
+      const isBookmarked = item.classList.contains('vine-bookmarked');
+      const isNew = item.classList.contains('vine-new-item');
+      const itemId = item.dataset.vineItemId || '';
+      const isHidden = item.style.display === 'none';
+
+      return `
+        <tr class="vine-table-row ${isSeen ? 'vine-table-row-seen' : ''} ${isBookmarked ? 'vine-table-row-bookmarked' : ''} ${isNew ? 'vine-table-row-new' : ''}" 
+            data-item-id="${itemId}" 
+            style="${isHidden ? 'display: none;' : ''}">
+          <td class="vine-table-cell vine-table-cell-image">
+            <img src="${image}" alt="Product" class="vine-table-image">
+          </td>
+          <td class="vine-table-cell vine-table-cell-title">
+            <a href="${link}" target="_blank" class="vine-table-link">${title}</a>
+            ${isNew ? '<span class="vine-table-badge-new">NEW</span>' : ''}
+          </td>
+          <td class="vine-table-cell vine-table-cell-etv">${etv}</td>
+          <td class="vine-table-cell vine-table-cell-status">
+            ${isSeen ? '<span class="vine-table-badge vine-table-badge-seen">✓ Seen</span>' : '<span class="vine-table-badge">Not Seen</span>'}
+            ${isBookmarked ? '<span class="vine-table-badge vine-table-badge-bookmarked">⭐ Bookmarked</span>' : ''}
+          </td>
+          <td class="vine-table-cell vine-table-cell-actions">
+            <button class="vine-table-btn vine-table-btn-seen" data-action="toggle-seen" data-item-id="${itemId}" title="${isSeen ? 'Mark as Unseen' : 'Mark as Seen'}">
+              ${isSeen ? '👁️' : '👁️‍🗨️'}
+            </button>
+            <button class="vine-table-btn vine-table-btn-bookmark" data-action="toggle-bookmark" data-item-id="${itemId}" title="${isBookmarked ? 'Remove Bookmark' : 'Add Bookmark'}">
+              ${isBookmarked ? '⭐' : '☆'}
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <table class="vine-table">
+        <thead class="vine-table-header">
+          <tr>
+            <th class="vine-table-header-cell">Image</th>
+            <th class="vine-table-header-cell">Product Title</th>
+            <th class="vine-table-header-cell">ETV</th>
+            <th class="vine-table-header-cell">Status</th>
+            <th class="vine-table-header-cell">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="vine-table-body">
+          ${rows}
+        </tbody>
+      </table>
+    `;
+  }
+
+  attachTableEventListeners(tableContainer) {
+    // Handle action buttons
+    tableContainer.addEventListener('click', (e) => {
+      const button = e.target.closest('[data-action]');
+      if (!button) return;
+
+      const action = button.dataset.action;
+      const itemId = button.dataset.itemId;
+
+      if (action === 'toggle-seen') {
+        this.emit('toggleSeenFromTable', { itemId });
+      } else if (action === 'toggle-bookmark') {
+        this.emit('toggleBookmarkFromTable', { itemId });
+      }
+    });
+  }
+
+  // Update table row when item state changes
+  updateTableRow(itemId, updates) {
+    const tableContainer = document.getElementById('vine-table-container');
+    if (!tableContainer || this.currentView !== 'table') return;
+
+    const row = tableContainer.querySelector(`tr[data-item-id="${itemId}"]`);
+    if (!row) return;
+
+    if (updates.seen !== undefined) {
+      row.classList.toggle('vine-table-row-seen', updates.seen);
+      const statusCell = row.querySelector('.vine-table-cell-status');
+      const seenBtn = row.querySelector('[data-action="toggle-seen"]');
+      
+      if (statusCell) {
+        const seenBadge = statusCell.querySelector('.vine-table-badge-seen');
+        if (updates.seen && !seenBadge) {
+          statusCell.insertAdjacentHTML('afterbegin', '<span class="vine-table-badge vine-table-badge-seen">✓ Seen</span>');
+        } else if (!updates.seen && seenBadge) {
+          seenBadge.remove();
+        }
+      }
+      
+      if (seenBtn) {
+        seenBtn.textContent = updates.seen ? '👁️' : '👁️‍🗨️';
+        seenBtn.title = updates.seen ? 'Mark as Unseen' : 'Mark as Seen';
+      }
+    }
+
+    if (updates.bookmarked !== undefined) {
+      row.classList.toggle('vine-table-row-bookmarked', updates.bookmarked);
+      const statusCell = row.querySelector('.vine-table-cell-status');
+      const bookmarkBtn = row.querySelector('[data-action="toggle-bookmark"]');
+      
+      if (statusCell) {
+        const bookmarkBadge = statusCell.querySelector('.vine-table-badge-bookmarked');
+        if (updates.bookmarked && !bookmarkBadge) {
+          statusCell.insertAdjacentHTML('beforeend', '<span class="vine-table-badge vine-table-badge-bookmarked">⭐ Bookmarked</span>');
+        } else if (!updates.bookmarked && bookmarkBadge) {
+          bookmarkBadge.remove();
+        }
+      }
+      
+      if (bookmarkBtn) {
+        bookmarkBtn.textContent = updates.bookmarked ? '⭐' : '☆';
+        bookmarkBtn.title = updates.bookmarked ? 'Remove Bookmark' : 'Add Bookmark';
+      }
+    }
+
+    if (updates.visible !== undefined) {
+      row.style.display = updates.visible ? '' : 'none';
     }
   }
 
@@ -293,6 +541,10 @@ class UIManager extends BaseManager {
     super.cleanup();
     if (this.controlPanel && this.controlPanel.parentNode) {
       this.controlPanel.parentNode.removeChild(this.controlPanel);
+    }
+    const tableContainer = document.getElementById('vine-table-container');
+    if (tableContainer && tableContainer.parentNode) {
+      tableContainer.parentNode.removeChild(tableContainer);
     }
   }
 } 

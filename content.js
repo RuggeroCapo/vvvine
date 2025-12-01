@@ -19,8 +19,32 @@ class AmazonVineEnhancer {
       } else if (request.action === 'clearFilter') {
         this.handleClearFilter();
         sendResponse({ success: true });
+      } else if (request.action === 'startMonitoring') {
+        this.handleStartMonitoring(request.config);
+        sendResponse({ success: true });
+      } else if (request.action === 'stopMonitoring') {
+        this.handleStopMonitoring();
+        sendResponse({ success: true });
+      } else if (request.action === 'testNotification') {
+        // Handle async operation properly
+        this.handleTestNotification()
+          .then(() => sendResponse({ success: true }))
+          .catch(error => sendResponse({ success: false, error: error.message }));
+        return true; // Keep channel open for async response
+      } else if (request.action === 'clearNotifiedItems') {
+        // Handle async operation properly
+        this.handleClearNotifiedItems()
+          .then(() => sendResponse({ success: true }))
+          .catch(error => sendResponse({ success: false, error: error.message }));
+        return true; // Keep channel open for async response
+      } else if (request.action === 'updateTelegramConfig') {
+        // Handle async operation properly
+        this.handleUpdateTelegramConfig(request.config)
+          .then(() => sendResponse({ success: true }))
+          .catch(error => sendResponse({ success: false, error: error.message }));
+        return true; // Keep channel open for async response
       }
-      return true; // Keep message channel open for async response
+      return false; // Close channel for sync responses
     });
   }
 
@@ -29,10 +53,8 @@ class AmazonVineEnhancer {
     if (pageManager) {
       if (enabled) {
         pageManager.enableAutoNavigation();
-        console.log('Auto-navigation enabled via popup');
       } else {
         pageManager.disableAutoNavigation();
-        console.log('Auto-navigation disabled via popup');
       }
     }
   }
@@ -43,12 +65,59 @@ class AmazonVineEnhancer {
     if (filterManager && uiManager) {
       filterManager.clearFilter();
       uiManager.clearFilter();
-      console.log('Search filter cleared via popup');
+    }
+  }
+
+  handleStartMonitoring(config) {
+    const monitoringManager = this.managers.monitoring;
+    if (monitoringManager) {
+      monitoringManager.startMonitoring(config);
+    }
+  }
+
+  handleStopMonitoring() {
+    const monitoringManager = this.managers.monitoring;
+    if (monitoringManager) {
+      monitoringManager.stopMonitoring();
+    }
+  }
+
+  async handleTestNotification() {
+    const notificationProvider = this.managers.notificationProvider;
+
+    if (!notificationProvider) {
+      console.error('NotificationProvider is not initialized yet. Please wait for initialization to complete.');
+      throw new Error('NotificationProvider not initialized');
+    }
+
+    if (!notificationProvider.isInitialized) {
+      console.error('NotificationProvider has not completed setup yet. Please wait.');
+      throw new Error('NotificationProvider not ready');
+    }
+
+    try {
+      await notificationProvider.testConnection();
+    } catch (error) {
+      console.error('Failed to send test notification:', error);
+      throw error;
+    }
+  }
+
+  async handleClearNotifiedItems() {
+    const monitoringManager = this.managers.monitoring;
+    if (monitoringManager) {
+      await monitoringManager.clearNotifiedItems();
+    }
+  }
+
+  async handleUpdateTelegramConfig(config) {
+    const notificationProvider = this.managers.notificationProvider;
+    if (notificationProvider) {
+      await notificationProvider.saveTelegramConfig(config);
     }
   }
 
   async init() {
-    console.log('Amazon Vine Efficiency Enhancer - Initializing...');
     
     try {
       // Wait for the grid to be available
@@ -64,8 +133,6 @@ class AmazonVineEnhancer {
       await this.startManagers();
       
       this.isInitialized = true;
-      console.log('Amazon Vine Efficiency Enhancer - Fully initialized');
-      
     } catch (error) {
       console.error('Failed to initialize Amazon Vine Enhancer:', error);
     }
@@ -91,6 +158,11 @@ class AmazonVineEnhancer {
     this.managers.filter = new FilterManager();
     this.managers.seenItems = new SeenItemsManager();
     this.managers.bookmarks = new BookmarkManager();
+    this.managers.newItems = new NewItemsManager();
+    this.managers.pageDetection = new PageDetectionManager();
+    this.managers.categoryTracker = new CategoryTrackerManager();
+    this.managers.notificationProvider = new NotificationProviderManager();
+    this.managers.monitoring = new MonitoringManager();
     this.managers.ui = new UIManager();
     this.managers.keyboard = new KeyboardManager();
     this.managers.page = new PageManager();
@@ -114,6 +186,18 @@ class AmazonVineEnhancer {
     // Setup dependencies between managers
     this.managers.seenItems.setStorageManager(this.managers.storage);
     this.managers.bookmarks.setStorageManager(this.managers.storage);
+    this.managers.newItems.setStorageManager(this.managers.storage);
+
+    // Setup monitoring dependencies
+    if (this.managers.monitoring) {
+      this.managers.monitoring.setNotificationProvider(this.managers.notificationProvider);
+      this.managers.monitoring.setNewItemsManager(this.managers.newItems);
+      this.managers.monitoring.setPageDetectionManager(this.managers.pageDetection);
+    }
+
+    // Expose managers globally for early access (before full initialization completes)
+    window.vineNotificationProvider = this.managers.notificationProvider;
+    window.vineMonitoringManager = this.managers.monitoring;
     
     // Special keyboard manager event handling for seen items
     window.vineEventBus.on('toggleItemSeen', (data) => {
@@ -124,25 +208,88 @@ class AmazonVineEnhancer {
     window.vineEventBus.on('toggleItemBookmark', (data) => {
       this.managers.bookmarks.toggleItemBookmark(data.title, data.url, data.pageNumber, data.pageUrl, data.item);
     });
+
+    // Table view event handlers - sync with card view
+    window.vineEventBus.on('toggleSeenFromTable', (data) => {
+      const item = document.querySelector(`.vvp-item-tile[data-vine-item-id="${data.itemId}"]`);
+      if (item) {
+        const title = item.querySelector('.vvp-item-product-title-container a')?.textContent.trim();
+        if (title) {
+          this.managers.seenItems.toggleItemSeen(title, item);
+          // Update table row
+          const isSeen = item.classList.contains('vine-seen');
+          this.managers.ui.updateTableRow(data.itemId, { seen: isSeen });
+        }
+      }
+    });
+
+    window.vineEventBus.on('toggleBookmarkFromTable', (data) => {
+      const item = document.querySelector(`.vvp-item-tile[data-vine-item-id="${data.itemId}"]`);
+      if (item) {
+        const title = item.querySelector('.vvp-item-product-title-container a')?.textContent.trim();
+        const url = item.querySelector('.vvp-item-product-title-container a')?.href;
+        const pageNumber = this.managers.ui.currentPage;
+        const pageUrl = window.location.href;
+        
+        if (title && url) {
+          this.managers.bookmarks.toggleItemBookmark(title, url, pageNumber, pageUrl, item);
+          // Update table row
+          const isBookmarked = item.classList.contains('vine-bookmarked');
+          this.managers.ui.updateTableRow(data.itemId, { bookmarked: isBookmarked });
+        }
+      }
+    });
+
+    // Sync card changes to table view
+    window.vineEventBus.on('itemMarkedSeen', (data) => {
+      if (data.item && data.item.dataset.vineItemId) {
+        this.managers.ui.updateTableRow(data.item.dataset.vineItemId, { seen: true });
+      }
+    });
+
+    window.vineEventBus.on('itemMarkedUnseen', (data) => {
+      if (data.item && data.item.dataset.vineItemId) {
+        this.managers.ui.updateTableRow(data.item.dataset.vineItemId, { seen: false });
+      }
+    });
+
+    window.vineEventBus.on('itemBookmarked', (data) => {
+      if (data.item && data.item.dataset.vineItemId) {
+        this.managers.ui.updateTableRow(data.item.dataset.vineItemId, { bookmarked: true });
+      }
+    });
+
+    window.vineEventBus.on('itemUnbookmarked', (data) => {
+      if (data.item && data.item.dataset.vineItemId) {
+        this.managers.ui.updateTableRow(data.item.dataset.vineItemId, { bookmarked: false });
+      }
+    });
     
     // Expose some managers globally for advanced usage
     window.vinePageManager = this.managers.page;
     window.vineKeyboardManager = this.managers.keyboard;
     window.vineStorageManager = this.managers.storage;
     window.vineBookmarkManager = this.managers.bookmarks;
+    window.vineNewItemsManager = this.managers.newItems;
+    window.vineMonitoringManager = this.managers.monitoring;
+    window.vineNotificationProvider = this.managers.notificationProvider;
   }
 
   async startManagers() {
     // Initialize managers in the correct order
     const initOrder = [
-      'storage',    // Must be first to load seen items and bookmarks
-      'title',      // Independent
-      'filter',     // Independent  
-      'seenItems',  // Depends on storage
-      'bookmarks',  // Depends on storage
-      'ui',         // Needs to be available for status updates
-      'keyboard',   // Coordinates with other managers
-      'page'        // Independent
+      'storage',             // Must be first to load seen items and bookmarks
+      'filter',              // Independent
+      'seenItems',           // Depends on storage
+      'bookmarks',           // Depends on storage
+      'newItems',            // Depends on storage
+      'pageDetection',       // Independent
+      'categoryTracker',     // Depends on storage, pageDetection
+      'notificationProvider',// Independent
+      'monitoring',          // Depends on storage, newItems, pageDetection, notificationProvider
+      'ui',                  // Needs to be available for status updates
+      'keyboard',            // Coordinates with other managers
+      'page'                 // Independent
     ];
 
     for (const managerName of initOrder) {
@@ -150,8 +297,7 @@ class AmazonVineEnhancer {
       if (manager) {
         try {
           await manager.init();
-          console.log(`✓ ${managerName} manager initialized`);
-          
+
           // Check auto-navigation setting after page manager is initialized
           if (managerName === 'page') {
             await this.initializeAutoNavigation(manager);
@@ -171,16 +317,13 @@ class AmazonVineEnhancer {
       
       if (autoNavigationEnabled) {
         pageManager.enableAutoNavigation();
-        console.log('✓ Auto-navigation enabled for infinite scroll');
       } else {
         pageManager.disableAutoNavigation();
-        console.log('✓ Auto-navigation disabled by user setting');
       }
     } catch (error) {
       console.error('Error checking auto-navigation setting:', error);
       // Default to enabled if there's an error
       pageManager.enableAutoNavigation();
-      console.log('✓ Auto-navigation enabled (default fallback)');
     }
   }
 
@@ -213,11 +356,10 @@ class AmazonVineEnhancer {
     delete window.vineKeyboardManager;
     delete window.vineStorageManager;
     delete window.vineBookmarkManager;
+    delete window.vineNewItemsManager;
     
     this.managers = {};
     this.isInitialized = false;
-    
-    console.log('Amazon Vine Enhancer - Cleaned up');
   }
 
   // Debug and development helpers

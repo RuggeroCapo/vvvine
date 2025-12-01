@@ -9,7 +9,6 @@ class StorageManager extends BaseManager {
   async setup() {
     await this.loadSeenItems();
     await this.loadBookmarks();
-    console.log(`StorageManager: Loaded ${this.seenItems.size} seen items and ${this.bookmarks.size} bookmarks`);
   }
 
   async loadSeenItems() {

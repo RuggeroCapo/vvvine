@@ -15,7 +15,6 @@ class PageManager extends BaseManager {
     this.setupEventListeners();
     this.setupInfiniteScrollDetection();
     this.setupAutoPaginationDetection();
-    console.log(`PageManager: Initialized on page ${this.currentPage}`);
   }
 
   setupEventListeners() {
@@ -58,8 +57,6 @@ class PageManager extends BaseManager {
     
     const url = new URL(window.location);
     url.searchParams.set('page', pageNumber);
-    
-    console.log(`PageManager: Navigating to page ${pageNumber}`);
     window.location.href = url.toString();
   }
 
@@ -103,12 +100,10 @@ class PageManager extends BaseManager {
     const lastItem = document.querySelector('.vvp-item-tile:last-child');
     if (lastItem && this.observer) {
       this.observer.observe(lastItem);
-      console.log('PageManager: Observing last item for infinite scroll');
     }
   }
 
   handleInfiniteScrollTrigger() {
-    console.log('PageManager: Infinite scroll triggered - near end of page');
     
     this.isLoading = true;
     this.emit('infiniteScrollTriggered', {
@@ -130,7 +125,6 @@ class PageManager extends BaseManager {
   enableInfiniteScroll() {
     this.infiniteScrollEnabled = true;
     this.observeLastItem();
-    console.log('PageManager: Infinite scroll enabled');
     
     this.emit('infiniteScrollEnabled');
   }
@@ -140,7 +134,6 @@ class PageManager extends BaseManager {
     if (this.observer) {
       this.observer.disconnect();
     }
-    console.log('PageManager: Infinite scroll disabled');
     
     this.emit('infiniteScrollDisabled');
   }
@@ -173,18 +166,15 @@ class PageManager extends BaseManager {
     const paginationElement = document.querySelector('.a-pagination');
     if (paginationElement && this.paginationObserver) {
       this.paginationObserver.observe(paginationElement);
-      console.log('PageManager: Observing pagination for auto-navigation');
     }
   }
 
   handleAutoPaginationTrigger() {
-    console.log('PageManager: Pagination is visible - checking for next page');
     
     // Check if next page is available
     const nextButton = document.querySelector('.a-pagination .a-last:not(.a-disabled) a');
     
     if (nextButton) {
-      console.log(`PageManager: Next page available - will navigate in ${this.autoNavigationDelay}ms`);
       
       this.isLoading = true;
       this.emit('autoNavigationTriggered', {
@@ -198,7 +188,6 @@ class PageManager extends BaseManager {
       
       setTimeout(() => {
         if (this.autoNavigationEnabled && !document.hidden) {
-          console.log('PageManager: Auto-navigating to next page');
           window.location.href = nextButton.href;
         } else {
           this.isLoading = false;
@@ -206,7 +195,6 @@ class PageManager extends BaseManager {
         }
       }, this.autoNavigationDelay);
     } else {
-      console.log('PageManager: No next page available - reached end');
       this.emit('autoNavigationReachedEnd', {
         currentPage: this.currentPage
       });
@@ -271,7 +259,6 @@ class PageManager extends BaseManager {
   enableAutoNavigation() {
     this.autoNavigationEnabled = true;
     this.observePagination();
-    console.log('PageManager: Auto-navigation enabled');
     
     this.emit('autoNavigationEnabled');
   }

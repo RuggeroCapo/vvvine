@@ -10,7 +10,6 @@ class KeyboardManager extends BaseManager {
     this.setupKeyHandlers();
     this.setupEventListeners();
     this.updateItemsList();
-    console.log('KeyboardManager: Initialized with navigation support');
   }
 
   setupKeyHandlers() {
@@ -94,14 +93,12 @@ class KeyboardManager extends BaseManager {
         this.showAutoNavigationStatus('Auto-navigation enabled', '#51cf66');
       } else {
         window.vinePageManager.disableAutoNavigation();
-        console.log('KeyboardManager: Auto-navigation disabled via keyboard shortcut');
         this.showAutoNavigationStatus('Auto-navigation disabled', '#ff6b6b');
       }
       
       // Persist the setting to storage
       try {
         await chrome.storage.local.set({ vineAutoNavigationEnabled: newState });
-        console.log(`KeyboardManager: Auto-navigation setting persisted: ${newState}`);
       } catch (error) {
         console.error('KeyboardManager: Error persisting auto-navigation setting:', error);
       }
@@ -167,7 +164,6 @@ class KeyboardManager extends BaseManager {
   handleToggleBookmarkSidebar(e) {
     // Toggle bookmark sidebar
     this.emit('toggleBookmarkSidebar');
-    console.log('KeyboardManager: Bookmark sidebar toggled via keyboard shortcut');
   }
 
   handleEscapeKey(e) {
@@ -183,7 +179,6 @@ class KeyboardManager extends BaseManager {
   // Navigation methods
   updateItemsList() {
     this.items = Array.from(document.querySelectorAll('.vvp-item-tile:not([style*="display: none"])'));
-    console.log(`KeyboardManager: Updated items list - ${this.items.length} visible items`);
   }
 
   navigatePages(direction) {

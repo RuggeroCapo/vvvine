@@ -9,7 +9,6 @@ class FilterManager extends BaseManager {
   async setup() {
     this.setupEventListeners();
     await this.loadStoredFilter();
-    console.log('FilterManager: Initialized');
   }
 
   async loadStoredFilter() {
@@ -19,7 +18,6 @@ class FilterManager extends BaseManager {
       
       if (storedQuery) {
         this.currentFilter = storedQuery;
-        console.log(`FilterManager: Loaded stored filter: "${storedQuery}"`);
         
         // Apply the filter after a short delay to ensure DOM is ready
         setTimeout(() => {
@@ -60,8 +58,9 @@ class FilterManager extends BaseManager {
     items.forEach(item => {
       const title = this.extractItemTitle(item);
       const matches = this.itemMatchesQuery(title, lowerQuery);
+      const isVisible = matches || !query;
       
-      if (matches || !query) {
+      if (isVisible) {
         item.style.display = '';
         visibleCount++;
         this.filteredItems.delete(item);
@@ -69,6 +68,12 @@ class FilterManager extends BaseManager {
         item.style.display = 'none';
         filteredCount++;
         this.filteredItems.add(item);
+      }
+
+      // Sync with table view
+      const itemId = item.dataset.vineItemId;
+      if (itemId) {
+        this.emit('updateTableRowVisibility', { itemId, visible: isVisible });
       }
     });
 
@@ -78,8 +83,6 @@ class FilterManager extends BaseManager {
       filteredCount: filteredCount,
       totalCount: items.length
     });
-
-    console.log(`FilterManager: Filtered "${query}" - ${visibleCount} visible, ${filteredCount} hidden`);
   }
 
   itemMatchesQuery(title, lowerQuery) {
@@ -168,7 +171,6 @@ class FilterManager extends BaseManager {
   filterByCategory(category) {
     // Future enhancement: filter by product category
     // This would require extracting category information from items
-    console.log(`FilterManager: Category filtering for "${category}" not yet implemented`);
   }
 
   // Combined filtering - applies text filter while respecting other filters
@@ -211,7 +213,5 @@ class FilterManager extends BaseManager {
     this.emit('filtersReset', {
       visibleCount: items.length
     });
-
-    console.log('FilterManager: All filters reset');
   }
 } 
