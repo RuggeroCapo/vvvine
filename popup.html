@@ -119,10 +119,23 @@
             <span>Refresh Interval</span>
             <span class="form-label-value" id="refresh-interval-display">5min</span>
           </label>
-          <input type="range" id="refresh-interval" min="60" max="1800" value="300" step="60" class="range-input">
+          
+          <!-- Time Unit Selection -->
+          <div class="time-unit-selector">
+            <label class="time-unit-option">
+              <input type="radio" name="time-unit" value="seconds" id="time-unit-seconds" class="time-unit-radio">
+              <span>Seconds</span>
+            </label>
+            <label class="time-unit-option">
+              <input type="radio" name="time-unit" value="minutes" id="time-unit-minutes" class="time-unit-radio" checked>
+              <span>Minutes</span>
+            </label>
+          </div>
+          
+          <input type="range" id="refresh-interval" min="5" max="30" value="5" step="1" class="range-input">
           <div class="range-labels">
-            <span>1min</span>
-            <span>30min</span>
+            <span id="range-min-label">1min</span>
+            <span id="range-max-label">30min</span>
           </div>
         </div>
 
@@ -189,6 +202,47 @@
           </button>
         </div>
         <div id="telegram-status" class="telegram-status" style="display: none;"></div>
+      </div>
+    </div>
+
+    <!-- Rocket Button Settings Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🚀</div>
+        <h2 class="card-title">One-Click Purchase</h2>
+      </div>
+      <div class="card-content">
+        <p class="card-description">Configure rocket button for fast purchases</p>
+        
+        <!-- Enable/Disable Toggle -->
+        <div class="toggle-container">
+          <div class="toggle-info">
+            <h3>Enable Rocket Button</h3>
+            <p>Show one-click purchase button on items</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="rocket-enabled-toggle" class="toggle-input" checked>
+            <div class="toggle-slider"></div>
+          </label>
+        </div>
+
+        <!-- Address Selection -->
+        <div class="form-group">
+          <label class="form-label" for="purchase-address">Delivery Address</label>
+          <select id="purchase-address" class="select-input">
+            <option value="">Select an address...</option>
+          </select>
+          <p class="form-hint">Visit a Vine page to load your addresses</p>
+        </div>
+
+        <!-- Refresh Addresses Button -->
+        <button id="refresh-addresses" class="btn btn-small btn-primary">
+          <span class="btn-icon">🔄</span>
+          Refresh Addresses
+        </button>
+
+        <!-- Address Status -->
+        <div id="address-status" class="address-status" style="display: none;"></div>
       </div>
     </div>
 

@@ -192,8 +192,11 @@ async function handleRefreshPageAlarm() {
       return;
     }
 
-    // Reload the tab
-    await chrome.tabs.reload(vineTab.id);
+    // Navigate to the queue URL without page parameter to reset to page 1
+    const targetUrl = getQueueUrl(result.vineMonitoringConfig);
+    if (targetUrl) {
+      await chrome.tabs.update(vineTab.id, { url: targetUrl });
+    }
   } catch (error) {
     console.error('Error in refresh page alarm:', error);
   }

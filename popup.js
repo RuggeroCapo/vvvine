@@ -92,12 +92,30 @@ function setupEventListeners() {
   document.getElementById('save-telegram-config').addEventListener('click', saveTelegramConfig);
   document.getElementById('test-telegram').addEventListener('click', testTelegramConnection);
   
+  // Rocket button settings
+  document.getElementById('rocket-enabled-toggle').addEventListener('change', toggleRocketButton);
+  document.getElementById('purchase-address').addEventListener('change', savePurchaseAddress);
+  document.getElementById('refresh-addresses').addEventListener('click', refreshAddresses);
+  
   // Load Telegram config on startup
   loadTelegramConfig();
+  
+  // Load rocket button settings on startup
+  loadRocketButtonSettings();
 
   // Real-time config display updates
   document.getElementById('refresh-interval').addEventListener('input', (e) => {
-    updateIntervalDisplay('refresh-interval-display', parseInt(e.target.value));
+    const timeUnit = document.querySelector('input[name="time-unit"]:checked').value;
+    const value = parseInt(e.target.value);
+    const seconds = timeUnit === 'seconds' ? value : value * 60;
+    updateIntervalDisplay('refresh-interval-display', seconds);
+  });
+
+  // Time unit selector
+  document.querySelectorAll('input[name="time-unit"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      updateTimeUnitSlider(e.target.value);
+    });
   });
 
   // Show/hide search query input based on radio selection
@@ -129,9 +147,26 @@ function updateIntervalDisplay(elementId, seconds) {
 }
 
 function loadMonitoringConfig(config) {
-  // Load refresh interval
-  document.getElementById('refresh-interval').value = config.refreshIntervalSeconds || 300;
-  updateIntervalDisplay('refresh-interval-display', config.refreshIntervalSeconds || 300);
+  const intervalSeconds = config.refreshIntervalSeconds || 300;
+  
+  // Determine if we should use seconds or minutes based on the interval
+  let timeUnit = 'minutes';
+  let sliderValue = Math.floor(intervalSeconds / 60);
+  
+  // If interval is less than 60 seconds or not a multiple of 60, use seconds
+  if (intervalSeconds < 60 || intervalSeconds % 60 !== 0) {
+    timeUnit = 'seconds';
+    sliderValue = intervalSeconds;
+  }
+  
+  // Set time unit radio
+  document.getElementById(`time-unit-${timeUnit}`).checked = true;
+  
+  // Update slider range and value
+  updateTimeUnitSlider(timeUnit, sliderValue);
+  
+  // Update display
+  updateIntervalDisplay('refresh-interval-display', intervalSeconds);
 
   // Load queue selection
   const queue = config.queue || 'potluck';
@@ -150,6 +185,49 @@ function loadMonitoringConfig(config) {
   } else {
     searchContainer.style.display = 'none';
   }
+}
+
+function updateTimeUnitSlider(timeUnit, currentValue = null) {
+  const slider = document.getElementById('refresh-interval');
+  const minLabel = document.getElementById('range-min-label');
+  const maxLabel = document.getElementById('range-max-label');
+  
+  if (timeUnit === 'seconds') {
+    // Seconds mode: 10-300 seconds (10s to 5min)
+    slider.min = 10;
+    slider.max = 300;
+    slider.step = 10;
+    minLabel.textContent = '10s';
+    maxLabel.textContent = '5min';
+    
+    // Convert current value from minutes to seconds if needed
+    if (currentValue === null) {
+      const currentMinutes = parseInt(slider.value);
+      slider.value = currentMinutes * 60;
+    } else {
+      slider.value = currentValue;
+    }
+  } else {
+    // Minutes mode: 1-30 minutes
+    slider.min = 1;
+    slider.max = 30;
+    slider.step = 1;
+    minLabel.textContent = '1min';
+    maxLabel.textContent = '30min';
+    
+    // Convert current value from seconds to minutes if needed
+    if (currentValue === null) {
+      const currentSeconds = parseInt(slider.value);
+      slider.value = Math.max(1, Math.floor(currentSeconds / 60));
+    } else {
+      slider.value = currentValue;
+    }
+  }
+  
+  // Update display
+  const value = parseInt(slider.value);
+  const seconds = timeUnit === 'seconds' ? value : value * 60;
+  updateIntervalDisplay('refresh-interval-display', seconds);
 }
 
 async function exportData() {
@@ -414,10 +492,15 @@ async function saveMonitoringConfig() {
     const selectedRadio = document.querySelector('input[name="monitor-queue"]:checked');
     const queue = selectedRadio ? selectedRadio.value : 'potluck';
 
+    // Get time unit and calculate seconds
+    const timeUnit = document.querySelector('input[name="time-unit"]:checked').value;
+    const sliderValue = parseInt(document.getElementById('refresh-interval').value);
+    const refreshIntervalSeconds = timeUnit === 'seconds' ? sliderValue : sliderValue * 60;
+
     // Gather configuration from UI
     const config = {
       queue: queue,
-      refreshIntervalSeconds: parseInt(document.getElementById('refresh-interval').value),
+      refreshIntervalSeconds: refreshIntervalSeconds,
       searchQuery: queue === 'search' ? document.getElementById('monitoring-search-query').value.trim() : ''
     };
 
@@ -681,6 +764,202 @@ function showTelegramStatus(message, type) {
   statusElement.style.display = 'block';
   
   // Set color based on type
+  switch (type) {
+    case 'success':
+      statusElement.style.color = '#10b981';
+      statusElement.style.background = 'rgba(16, 185, 129, 0.1)';
+      break;
+    case 'error':
+      statusElement.style.color = '#ef4444';
+      statusElement.style.background = 'rgba(239, 68, 68, 0.1)';
+      break;
+    case 'info':
+    default:
+      statusElement.style.color = '#3b82f6';
+      statusElement.style.background = 'rgba(59, 130, 246, 0.1)';
+      break;
+  }
+  
+  // Auto-hide after 5 seconds for success/info
+  if (type !== 'error') {
+    setTimeout(() => {
+      statusElement.style.display = 'none';
+    }, 5000);
+  }
+}
+
+// Rocket Button Settings Functions
+
+async function loadRocketButtonSettings() {
+  try {
+    const result = await chrome.storage.local.get([
+      'vineRocketEnabled',
+      'vinePurchaseAddressId',
+      'vineAvailableAddresses'
+    ]);
+    
+    // Load enabled state
+    const rocketEnabled = result.vineRocketEnabled !== false; // Default to true
+    document.getElementById('rocket-enabled-toggle').checked = rocketEnabled;
+    
+    // Load addresses
+    const addresses = result.vineAvailableAddresses || [];
+    const selectedAddressId = result.vinePurchaseAddressId || '';
+    
+    populateAddressDropdown(addresses, selectedAddressId);
+    
+  } catch (error) {
+    console.error('Failed to load rocket button settings:', error);
+  }
+}
+
+function populateAddressDropdown(addresses, selectedId) {
+  const select = document.getElementById('purchase-address');
+  
+  // Clear existing options except the first one
+  select.innerHTML = '<option value="">Select an address...</option>';
+  
+  if (addresses.length === 0) {
+    const hint = document.querySelector('#purchase-address + .form-hint');
+    if (hint) {
+      hint.textContent = 'Visit a Vine page to load your addresses';
+      hint.style.color = '#6b7280';
+    }
+    return;
+  }
+  
+  // Add address options
+  addresses.forEach(address => {
+    const option = document.createElement('option');
+    option.value = address.id;
+    option.textContent = address.text;
+    option.dataset.legacyId = address.legacyId || '';
+    
+    if (address.id === selectedId || address.isDefault) {
+      option.selected = true;
+    }
+    
+    select.appendChild(option);
+  });
+  
+  // Update hint
+  const hint = document.querySelector('#purchase-address + .form-hint');
+  if (hint) {
+    hint.textContent = `${addresses.length} address${addresses.length !== 1 ? 'es' : ''} available`;
+    hint.style.color = '#10b981';
+  }
+}
+
+async function toggleRocketButton(event) {
+  const enabled = event.target.checked;
+  
+  try {
+    // Save to storage
+    await chrome.storage.local.set({ vineRocketEnabled: enabled });
+    
+    // Send message to content script
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab) {
+      await chrome.tabs.sendMessage(tab.id, {
+        action: 'setRocketEnabled',
+        enabled: enabled
+      });
+    }
+    
+    showAddressStatus(
+      enabled ? 'Rocket button enabled' : 'Rocket button disabled',
+      'success'
+    );
+  } catch (error) {
+    console.error('Failed to toggle rocket button:', error);
+    showAddressStatus('Failed to update setting', 'error');
+  }
+}
+
+async function savePurchaseAddress(event) {
+  const select = event.target;
+  const selectedOption = select.options[select.selectedIndex];
+  
+  if (!selectedOption || !selectedOption.value) {
+    return;
+  }
+  
+  const addressId = selectedOption.value;
+  const legacyAddressId = selectedOption.dataset.legacyId || null;
+  
+  try {
+    await chrome.storage.local.set({
+      vinePurchaseAddressId: addressId,
+      vinePurchaseLegacyAddressId: legacyAddressId
+    });
+    
+    showAddressStatus('Delivery address saved', 'success');
+  } catch (error) {
+    console.error('Failed to save address:', error);
+    showAddressStatus('Failed to save address', 'error');
+  }
+}
+
+async function refreshAddresses() {
+  const button = document.getElementById('refresh-addresses');
+  const originalText = button.innerHTML;
+  
+  try {
+    button.disabled = true;
+    button.innerHTML = '<span class="btn-icon">⏳</span> Loading...';
+    
+    // Get active tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    if (!tab) {
+      throw new Error('No active tab found');
+    }
+    
+    // Check if it's a Vine page
+    if (!tab.url.includes('amazon') || !tab.url.includes('vine')) {
+      throw new Error('Please navigate to an Amazon Vine page first');
+    }
+    
+    // Send message to content script to refresh addresses
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      action: 'refreshAddresses'
+    });
+    
+    if (response.success) {
+      // Reload addresses from storage
+      const result = await chrome.storage.local.get([
+        'vineAvailableAddresses',
+        'vinePurchaseAddressId'
+      ]);
+      
+      const addresses = result.vineAvailableAddresses || [];
+      const selectedId = result.vinePurchaseAddressId || '';
+      
+      populateAddressDropdown(addresses, selectedId);
+      
+      if (addresses.length > 0) {
+        showAddressStatus(`Loaded ${addresses.length} address${addresses.length !== 1 ? 'es' : ''}`, 'success');
+      } else {
+        showAddressStatus('No addresses found on page', 'info');
+      }
+    } else {
+      throw new Error(response.error || 'Failed to refresh addresses');
+    }
+  } catch (error) {
+    console.error('Failed to refresh addresses:', error);
+    showAddressStatus(error.message, 'error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = originalText;
+  }
+}
+
+function showAddressStatus(message, type = 'info') {
+  const statusElement = document.getElementById('address-status');
+  statusElement.textContent = message;
+  statusElement.style.display = 'block';
+  
+  // Style based on type
   switch (type) {
     case 'success':
       statusElement.style.color = '#10b981';

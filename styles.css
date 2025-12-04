@@ -1043,3 +1043,159 @@ body[data-vine-view="card"] #vvp-items-grid {
     transform: scale(1.05);
   }
 }
+
+/* Rocket Button Styles */
+.vine-rocket-btn {
+  position: absolute !important;
+  top: 12px !important;
+  right: 96px !important; /* Position to the left of bookmark and seen buttons */
+  width: 35px !important;
+  height: 35px !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  font-size: 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 0 6px rgba(0, 255, 255, 0.5) !important;
+  transition: all 0.2s ease !important;
+  z-index: 35 !important; /* Higher than NEW badge (30) */
+  padding: 0 !important;
+  border: none !important;
+}
+
+.vine-rocket-btn:hover:not(:disabled) {
+  transform: scale(1.1) !important;
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.7) !important;
+}
+
+.vine-rocket-btn:active:not(:disabled) {
+  transform: scale(0.95) !important;
+}
+
+.vine-rocket-btn:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+/* Purchase Dialog Styles */
+.vine-purchase-dialog {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 10000 !important;
+  animation: vineFadeIn 0.1s ease !important;
+}
+
+.vine-purchase-dialog-content {
+  background: white !important;
+  padding: 24px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+  max-width: 400px !important;
+  width: 90% !important;
+  animation: vineScaleIn 0.1s ease !important;
+}
+
+.vine-purchase-dialog-content h3 {
+  margin: 0 0 16px 0 !important;
+  fontSize: 20px !important;
+  font-weight: 700 !important;
+  color: #1f2937 !important;
+}
+
+.vine-purchase-item-title {
+  margin: 0 0 8px 0 !important;
+  font-size: 14px !important;
+  color: #374151 !important;
+  font-weight: 500 !important;
+}
+
+.vine-purchase-item-asin {
+  margin: 0 0 20px 0 !important;
+  font-size: 12px !important;
+  color: #6b7280 !important;
+  font-family: monospace !important;
+}
+
+.vine-purchase-dialog-actions {
+  display: flex !important;
+  gap: 12px !important;
+  justify-content: flex-end !important;
+}
+
+.vine-btn-confirm {
+  background: linear-gradient(135deg, #667eea, #764ba2) !important;
+  color: white !important;
+  border: none !important;
+  padding: 10px 20px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+
+.vine-btn-confirm:hover {
+  background: linear-gradient(135deg, #5568d3, #6a3f91) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35) !important;
+}
+
+.vine-btn-cancel {
+  background: #e5e7eb !important;
+  color: #374151 !important;
+  border: none !important;
+  padding: 10px 20px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  transition: all 0.2s ease !important;
+}
+
+.vine-btn-cancel:hover {
+  background: #d1d5db !important;
+}
+
+/* Purchase Result Popup */
+.vine-purchase-result-popup {
+  position: fixed !important;
+  bottom: 20px !important;
+  right: 20px !important;
+  color: white !important;
+  padding: 16px 24px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+  z-index: 10001 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  animation: vineSlideIn 0.3s ease !important;
+}
+
+@keyframes vineFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes vineScaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

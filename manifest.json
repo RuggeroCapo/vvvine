@@ -48,6 +48,7 @@
         "managers/category-tracker-manager.js",
         "managers/notification-provider-manager.js",
         "managers/monitoring-manager.js",
+        "managers/purchase-manager.js",
         "managers/keyboard-manager.js",
         "managers/page-manager.js",
         "content.js"

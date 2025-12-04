@@ -184,13 +184,34 @@ class MonitoringManager extends BaseManager {
     if (!items || items.length === 0) return;
 
     try {
-      // Send batch notification
-      const itemsList = items
-        .slice(0, 5) // Limit to first 5 items
-        .map(item => `• ${item.title}`)
-        .join('\n');
+      // Format items for notification with truncation and cleaning
+      const formatItemForNotification = (item, index) => {
+        let title = item.title || 'Unknown item';
 
-      const moreText = items.length > 5 ? `\n... and ${items.length - 5} more` : '';
+        // Remove trailing ellipsis added by Amazon (…)
+        title = title.replace(/…+$/g, '').trim();
+
+        // Truncate long titles (keep first 80 chars)
+        const maxLength = 80;
+        if (title.length > maxLength) {
+          title = title.substring(0, maxLength).trim() + '…';
+        }
+
+        // Add numbered bullet for better readability
+        return `${index + 1}. ${title}`;
+      };
+
+      // Format list of items (limit to first 5)
+      const itemsToShow = items.slice(0, 5);
+      const itemsList = itemsToShow
+        .map((item, index) => formatItemForNotification(item, index))
+        .join('\n\n'); // Double newline for better spacing
+
+      // Add "and X more" text if there are more items
+      const moreText = items.length > 5
+        ? `\n\n_... and ${items.length - 5} more item${items.length - 5 > 1 ? 's' : ''}_`
+        : '';
+
       const queueLabel = this.getQueueLabel();
 
       await this.sendNotification({

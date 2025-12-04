@@ -148,10 +148,7 @@ class TelegramNotificationProvider extends NotificationProvider {
       console.log('Message:', notificationMessage);
       console.log('URL:', notificationUrl);
 
-      // Build Telegram message with Markdown formatting
-      let text = `*${notificationTitle}*\n\n${notificationMessage}`;
-
-      // Add priority indicator (since Telegram doesn't have native priority)
+      // Add priority indicator emoji
       const priorityEmoji = {
         'min': '🔵',
         'low': '🟢',
@@ -160,7 +157,10 @@ class TelegramNotificationProvider extends NotificationProvider {
         'urgent': '🔴'
       };
       const emoji = priorityEmoji[priority] || '🟡';
-      text = `${emoji} ${text}`;
+
+      // Build Telegram message with Markdown formatting
+      // Use bold for title, regular for message
+      let text = `${emoji} *${notificationTitle}*\n\n${notificationMessage}`;
 
       const telegramUrl = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
 
