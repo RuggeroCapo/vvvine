@@ -1106,7 +1106,7 @@ body[data-vine-view="card"] #vvp-items-grid {
 
 .vine-purchase-dialog-content h3 {
   margin: 0 0 16px 0 !important;
-  fontSize: 20px !important;
+  font-size: 20px !important;
   font-weight: 700 !important;
   color: #1f2937 !important;
 }
@@ -1197,5 +1197,187 @@ body[data-vine-view="card"] #vvp-items-grid {
   to {
     transform: scale(1);
     opacity: 1;
+  }
+}
+
+/* Hide NAVYAAN Footer and related elements */
+#navFooter,
+[id*="navFooter"],
+[class*="navFooter"],
+[data-testid*="footer"],
+.nav-footer,
+.navFooter,
+footer[role="contentinfo"],
+#footer,
+.footer,
+[aria-label*="footer" i],
+[aria-labelledby*="footer" i] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  left: -9999px !important;
+}
+
+/* Hide any elements that might contain NAVYAAN footer content */
+[id*="NAVYAAN"],
+[class*="NAVYAAN"],
+[data-testid*="NAVYAAN"] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Additional footer hiding rules for Amazon-specific elements */
+#rhf,
+#rhf-container,
+.rhf-frame,
+[id*="rhf"],
+[class*="rhf"] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Monitoring Controls in Control Panel */
+.vine-control-group-monitoring {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Monitoring toggle button states */
+.vine-btn-monitoring-off {
+  background: linear-gradient(135deg, #667eea, #764ba2) !important;
+}
+
+.vine-btn-monitoring-on {
+  background: linear-gradient(135deg, #10b981, #059669) !important;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35) !important;
+  animation: vineMonitoringPulse 2s ease-in-out infinite;
+}
+
+.vine-btn-monitoring-on:hover {
+  background: linear-gradient(135deg, #059669, #047857) !important;
+}
+
+@keyframes vineMonitoringPulse {
+  0%, 100% {
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35);
+  }
+  50% {
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5);
+  }
+}
+
+/* Monitoring Settings Panel */
+.vine-monitoring-panel {
+  background: rgba(255, 255, 255, 0.95);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 16px 18px;
+  animation: vineSlideDown 0.2s ease-out;
+}
+
+.vine-monitoring-panel-content {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+}
+
+.vine-monitoring-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vine-monitoring-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.vine-monitoring-queue-badge {
+  font-size: 13px;
+  font-weight: 600;
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.12);
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.vine-monitoring-interval {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vine-monitoring-interval input[type="range"] {
+  width: 120px;
+  height: 6px;
+  -webkit-appearance: none;
+  background: linear-gradient(to right, #667eea 0%, #e5e7eb 0%);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.vine-monitoring-interval input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+  transition: transform 0.2s ease;
+}
+
+.vine-monitoring-interval input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.vine-monitoring-interval input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+}
+
+.vine-monitoring-interval-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #667eea;
+  min-width: 50px;
+  text-align: center;
+  background: rgba(102, 126, 234, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+/* Responsive monitoring controls */
+@media (max-width: 1200px) {
+  .vine-monitoring-panel-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .vine-monitoring-section {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .vine-monitoring-panel {
+    padding: 12px 16px;
+  }
+
+  .vine-monitoring-interval input[type="range"] {
+    width: 100px;
   }
 }

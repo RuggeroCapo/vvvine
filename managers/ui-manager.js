@@ -7,10 +7,21 @@ class UIManager extends BaseManager {
   }
 
   async setup() {
-    await this.waitForElement('#vvp-items-grid');
+    console.log('[Vine Enhancer] UIManager setup starting...');
+    
+    // Wait for the tab content (exists even without products)
+    try {
+      await this.waitForElement('.vvp-tab-content');
+      console.log('[Vine Enhancer] .vvp-tab-content found');
+    } catch (error) {
+      console.error('[Vine Enhancer] Failed to find .vvp-tab-content:', error);
+      return;
+    }
+    
     this.createControlPanel();
     this.setupControlListeners();
     this.setupStatusUpdates();
+    console.log('[Vine Enhancer] UIManager setup complete');
   }
 
   getCurrentPageNumber() {
@@ -48,6 +59,18 @@ class UIManager extends BaseManager {
 
         <div class="vine-control-separator"></div>
 
+        <div class="vine-control-group vine-control-group-monitoring">
+          <button id="monitoring-toggle" class="vine-btn-monitoring-off" title="Start/Stop Monitoring">
+            <span class="vine-btn-icon">▶️</span>
+            <span class="vine-btn-text">Monitor</span>
+          </button>
+          <button id="monitoring-settings" title="Monitoring Settings">
+            <span class="vine-btn-icon">⚙️</span>
+          </button>
+        </div>
+
+        <div class="vine-control-separator"></div>
+
         <div class="vine-control-group vine-control-group-view">
           <button id="toggle-view" title="Toggle Card/Table View">
             <span class="vine-btn-icon">📊</span>
@@ -69,11 +92,34 @@ class UIManager extends BaseManager {
           <span id="status-info">Page ${this.currentPage} | Loading...</span>
         </div>
       </div>
+
+      <!-- Monitoring Settings Panel (collapsible) -->
+      <div id="monitoring-settings-panel" class="vine-monitoring-panel" style="display: none;">
+        <div class="vine-monitoring-panel-content">
+          <div class="vine-monitoring-section">
+            <span class="vine-monitoring-label">Monitoring:</span>
+            <span id="monitoring-queue-display" class="vine-monitoring-queue-badge">Current Queue</span>
+          </div>
+          <div class="vine-monitoring-section">
+            <div class="vine-monitoring-interval">
+              <span class="vine-monitoring-label">Refresh:</span>
+              <input type="range" id="monitoring-interval" min="30" max="600" value="300" step="30">
+              <span id="monitoring-interval-display" class="vine-monitoring-interval-value">5min</span>
+            </div>
+          </div>
+        </div>
+      </div>
     `;
 
-    // Insert control panel at the top of the page
-    const grid = document.getElementById('vvp-items-grid');
-    grid.parentNode.insertBefore(this.controlPanel, grid);
+    // Insert control panel after the button/search container (always present)
+    const buttonSearchContainer = document.querySelector('.vvp-items-button-and-search-container');
+    console.log('[Vine Enhancer] Button/search container found:', buttonSearchContainer);
+    if (buttonSearchContainer) {
+      buttonSearchContainer.parentNode.insertBefore(this.controlPanel, buttonSearchContainer.nextSibling);
+      console.log('[Vine Enhancer] Control panel inserted successfully');
+    } else {
+      console.error('[Vine Enhancer] Could not find .vvp-items-button-and-search-container');
+    }
     
     // Add CSS for the slider
     this.addSliderStyles();
@@ -196,9 +242,155 @@ class UIManager extends BaseManager {
         this.emit('filterItems', { query: '' });
       }
     });
-    
+
     // Emit initial slider state to synchronize seen items manager
     this.syncSliderState();
+
+    // Setup monitoring controls
+    this.setupMonitoringControls();
+  }
+
+  setupMonitoringControls() {
+    // Toggle monitoring button
+    const monitoringToggle = document.getElementById('monitoring-toggle');
+    monitoringToggle.addEventListener('click', () => {
+      this.toggleMonitoring();
+    });
+
+    // Settings button to show/hide panel
+    const settingsBtn = document.getElementById('monitoring-settings');
+    const settingsPanel = document.getElementById('monitoring-settings-panel');
+    settingsBtn.addEventListener('click', () => {
+      const isVisible = settingsPanel.style.display !== 'none';
+      settingsPanel.style.display = isVisible ? 'none' : 'block';
+    });
+
+    // Interval slider
+    const intervalSlider = document.getElementById('monitoring-interval');
+    const intervalDisplay = document.getElementById('monitoring-interval-display');
+    intervalSlider.addEventListener('input', (e) => {
+      const seconds = parseInt(e.target.value);
+      intervalDisplay.textContent = this.formatInterval(seconds);
+    });
+
+    // Update queue display based on current page
+    this.updateQueueDisplay();
+
+    // Listen for monitoring state changes from MonitoringManager
+    this.on('monitoringStateChanged', (data) => {
+      this.updateMonitoringUI(data.isMonitoring, data.config);
+    });
+  }
+
+  getCurrentQueue() {
+    // Get queue from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const queue = urlParams.get('queue');
+    if (queue) {
+      return queue;
+    }
+    // Default to potluck if no queue parameter
+    return 'potluck';
+  }
+
+  getQueueLabel(queue) {
+    switch (queue) {
+      case 'potluck':
+        return 'Potluck';
+      case 'encore':
+        return 'Encore';
+      case 'last_chance':
+        return 'Last Chance';
+      default:
+        return queue || 'Unknown';
+    }
+  }
+
+  updateQueueDisplay() {
+    const queueDisplay = document.getElementById('monitoring-queue-display');
+    if (queueDisplay) {
+      const queue = this.getCurrentQueue();
+      queueDisplay.textContent = this.getQueueLabel(queue);
+    }
+  }
+
+  formatInterval(seconds) {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    } else if (seconds < 3600) {
+      const minutes = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}min`;
+    } else {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+    }
+  }
+
+  toggleMonitoring() {
+    const monitoringToggle = document.getElementById('monitoring-toggle');
+    const isCurrentlyMonitoring = monitoringToggle.classList.contains('vine-btn-monitoring-on');
+
+    if (isCurrentlyMonitoring) {
+      // Stop monitoring
+      this.emit('stopMonitoring');
+    } else {
+      // Start monitoring with current config
+      const config = this.getMonitoringConfig();
+      if (!config) return; // Validation failed
+      this.emit('startMonitoring', config);
+    }
+  }
+
+  getMonitoringConfig() {
+    // Get current queue from URL
+    const currentQueue = this.getCurrentQueue();
+
+    // Get refresh interval
+    const refreshIntervalSeconds = parseInt(document.getElementById('monitoring-interval').value);
+
+    return {
+      queues: [currentQueue],
+      refreshIntervalSeconds,
+      searchQuery: ''
+    };
+  }
+
+  updateMonitoringUI(isMonitoring, config) {
+    const monitoringToggle = document.getElementById('monitoring-toggle');
+    const icon = monitoringToggle.querySelector('.vine-btn-icon');
+    const text = monitoringToggle.querySelector('.vine-btn-text');
+
+    if (isMonitoring) {
+      monitoringToggle.classList.remove('vine-btn-monitoring-off');
+      monitoringToggle.classList.add('vine-btn-monitoring-on');
+      icon.textContent = '⏸️';
+      text.textContent = 'Stop';
+    } else {
+      monitoringToggle.classList.remove('vine-btn-monitoring-on');
+      monitoringToggle.classList.add('vine-btn-monitoring-off');
+      icon.textContent = '▶️';
+      text.textContent = 'Monitor';
+    }
+
+    // Update config UI if provided
+    if (config) {
+      this.updateMonitoringConfigUI(config);
+    }
+  }
+
+  updateMonitoringConfigUI(config) {
+    // Update queue display
+    this.updateQueueDisplay();
+
+    // Update interval slider
+    const intervalSlider = document.getElementById('monitoring-interval');
+    const intervalDisplay = document.getElementById('monitoring-interval-display');
+    if (intervalSlider && config.refreshIntervalSeconds) {
+      intervalSlider.value = config.refreshIntervalSeconds;
+      intervalDisplay.textContent = this.formatInterval(config.refreshIntervalSeconds);
+    }
   }
 
   syncSliderState() {

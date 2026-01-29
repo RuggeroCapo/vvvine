@@ -12,23 +12,13 @@ async function loadStats() {
       'vineKnownItems',
       'vineInstallDate',
       'vineAutoNavigationEnabled',
-      'vineSearchQuery',
-      'vineMonitoringEnabled',
-      'vineLastNotifiedItems',
-      'vineMonitoringConfig'
+      'vineSearchQuery'
     ]);
     const seenItems = result.vineSeenTitles || [];
     const knownItems = result.vineKnownItems || {};
     const installDate = result.vineInstallDate || Date.now();
     const autoNavigationEnabled = result.vineAutoNavigationEnabled !== false; // Default to true
     const searchQuery = result.vineSearchQuery || '';
-    const monitoringEnabled = result.vineMonitoringEnabled || false;
-    const notifiedItems = result.vineLastNotifiedItems || [];
-    const monitoringConfig = result.vineMonitoringConfig || {
-      queue: 'potluck',
-      searchQuery: '',
-      refreshIntervalSeconds: 300
-    };
 
     // Update seen count
     document.getElementById('seen-count').textContent = seenItems.length;
@@ -43,12 +33,6 @@ async function loadStats() {
     // Update auto-navigation toggle
     document.getElementById('auto-navigation-toggle').checked = autoNavigationEnabled;
 
-    // Load monitoring configuration
-    loadMonitoringConfig(monitoringConfig);
-    
-    // Update monitoring status
-    updateMonitoringStatus(monitoringEnabled, notifiedItems.length, monitoringConfig.queue, monitoringConfig.searchQuery);
-    
     // Update search filter display
     const searchFilterElement = document.getElementById('search-filter');
     if (searchQuery) {
@@ -58,7 +42,7 @@ async function loadStats() {
       searchFilterElement.textContent = 'None';
       searchFilterElement.title = '';
     }
-    
+
     // Get current page if on Vine
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab && tab.url && tab.url.includes('/vine/')) {
@@ -68,12 +52,12 @@ async function loadStats() {
     } else {
       document.getElementById('current-page').textContent = 'Not on Vine';
     }
-    
+
     // Set install date if first time
     if (!result.vineInstallDate) {
       await chrome.storage.local.set({ vineInstallDate: Date.now() });
     }
-    
+
   } catch (error) {
     console.error('Error loading stats:', error);
   }
@@ -86,148 +70,21 @@ function setupEventListeners() {
   document.getElementById('reset-category-counts').addEventListener('click', resetCategoryCounts);
   document.getElementById('clear-all').addEventListener('click', clearAllData);
   document.getElementById('auto-navigation-toggle').addEventListener('change', toggleAutoNavigation);
-  document.getElementById('toggle-monitoring-btn').addEventListener('click', toggleMonitoring);
   document.getElementById('test-notification').addEventListener('click', testNotification);
   document.getElementById('clear-notified').addEventListener('click', clearNotifiedItems);
   document.getElementById('save-telegram-config').addEventListener('click', saveTelegramConfig);
   document.getElementById('test-telegram').addEventListener('click', testTelegramConnection);
-  
+
   // Rocket button settings
   document.getElementById('rocket-enabled-toggle').addEventListener('change', toggleRocketButton);
   document.getElementById('purchase-address').addEventListener('change', savePurchaseAddress);
   document.getElementById('refresh-addresses').addEventListener('click', refreshAddresses);
-  
+
   // Load Telegram config on startup
   loadTelegramConfig();
-  
+
   // Load rocket button settings on startup
   loadRocketButtonSettings();
-
-  // Real-time config display updates
-  document.getElementById('refresh-interval').addEventListener('input', (e) => {
-    const timeUnit = document.querySelector('input[name="time-unit"]:checked').value;
-    const value = parseInt(e.target.value);
-    const seconds = timeUnit === 'seconds' ? value : value * 60;
-    updateIntervalDisplay('refresh-interval-display', seconds);
-  });
-
-  // Time unit selector
-  document.querySelectorAll('input[name="time-unit"]').forEach(radio => {
-    radio.addEventListener('change', (e) => {
-      updateTimeUnitSlider(e.target.value);
-    });
-  });
-
-  // Show/hide search query input based on radio selection
-  document.querySelectorAll('input[name="monitor-queue"]').forEach(radio => {
-    radio.addEventListener('change', (e) => {
-      const searchContainer = document.getElementById('search-query-container');
-      if (e.target.value === 'search') {
-        searchContainer.style.display = 'block';
-      } else {
-        searchContainer.style.display = 'none';
-      }
-    });
-  });
-}
-
-function updateIntervalDisplay(elementId, seconds) {
-  const display = document.getElementById(elementId);
-  if (seconds < 60) {
-    display.textContent = `${seconds}s`;
-  } else if (seconds < 3600) {
-    const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    display.textContent = secs > 0 ? `${minutes}m ${secs}s` : `${minutes}min`;
-  } else {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    display.textContent = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-  }
-}
-
-function loadMonitoringConfig(config) {
-  const intervalSeconds = config.refreshIntervalSeconds || 300;
-  
-  // Determine if we should use seconds or minutes based on the interval
-  let timeUnit = 'minutes';
-  let sliderValue = Math.floor(intervalSeconds / 60);
-  
-  // If interval is less than 60 seconds or not a multiple of 60, use seconds
-  if (intervalSeconds < 60 || intervalSeconds % 60 !== 0) {
-    timeUnit = 'seconds';
-    sliderValue = intervalSeconds;
-  }
-  
-  // Set time unit radio
-  document.getElementById(`time-unit-${timeUnit}`).checked = true;
-  
-  // Update slider range and value
-  updateTimeUnitSlider(timeUnit, sliderValue);
-  
-  // Update display
-  updateIntervalDisplay('refresh-interval-display', intervalSeconds);
-
-  // Load queue selection
-  const queue = config.queue || 'potluck';
-  const radioButton = document.getElementById(`monitor-${queue.replace('_', '-')}`);
-  if (radioButton) {
-    radioButton.checked = true;
-  }
-
-  // Load search query
-  document.getElementById('monitoring-search-query').value = config.searchQuery || '';
-
-  // Show/hide search query input
-  const searchContainer = document.getElementById('search-query-container');
-  if (queue === 'search') {
-    searchContainer.style.display = 'block';
-  } else {
-    searchContainer.style.display = 'none';
-  }
-}
-
-function updateTimeUnitSlider(timeUnit, currentValue = null) {
-  const slider = document.getElementById('refresh-interval');
-  const minLabel = document.getElementById('range-min-label');
-  const maxLabel = document.getElementById('range-max-label');
-  
-  if (timeUnit === 'seconds') {
-    // Seconds mode: 10-300 seconds (10s to 5min)
-    slider.min = 10;
-    slider.max = 300;
-    slider.step = 10;
-    minLabel.textContent = '10s';
-    maxLabel.textContent = '5min';
-    
-    // Convert current value from minutes to seconds if needed
-    if (currentValue === null) {
-      const currentMinutes = parseInt(slider.value);
-      slider.value = currentMinutes * 60;
-    } else {
-      slider.value = currentValue;
-    }
-  } else {
-    // Minutes mode: 1-30 minutes
-    slider.min = 1;
-    slider.max = 30;
-    slider.step = 1;
-    minLabel.textContent = '1min';
-    maxLabel.textContent = '30min';
-    
-    // Convert current value from seconds to minutes if needed
-    if (currentValue === null) {
-      const currentSeconds = parseInt(slider.value);
-      slider.value = Math.max(1, Math.floor(currentSeconds / 60));
-    } else {
-      slider.value = currentValue;
-    }
-  }
-  
-  // Update display
-  const value = parseInt(slider.value);
-  const seconds = timeUnit === 'seconds' ? value : value * 60;
-  updateIntervalDisplay('refresh-interval-display', seconds);
 }
 
 async function exportData() {
@@ -436,132 +293,6 @@ async function toggleAutoNavigation() {
     // Revert toggle state on error
     const toggle = document.getElementById('auto-navigation-toggle');
     toggle.checked = !toggle.checked;
-  }
-}
-
-async function toggleMonitoring() {
-  try {
-    const result = await chrome.storage.local.get(['vineMonitoringEnabled', 'vineMonitoringConfig']);
-    const isCurrentlyEnabled = result.vineMonitoringEnabled || false;
-    const newState = !isCurrentlyEnabled;
-
-    if (newState) {
-      // Starting monitoring - gather and save configuration
-      const config = await saveMonitoringConfig();
-      if (!config) return; // Validation failed
-
-      // Send message to background service worker to start monitoring
-      // The service worker will handle alarms and coordinate with content script
-      await chrome.runtime.sendMessage({
-        action: 'startMonitoring',
-        config: config
-      });
-
-      // Update button and status
-      const button = document.getElementById('toggle-monitoring-btn');
-      button.textContent = '⏸️ Stop Monitoring';
-      button.classList.remove('btn-primary');
-      button.classList.add('btn-red');
-
-      const notifiedResult = await chrome.storage.local.get(['vineLastNotifiedItems']);
-      const notifiedItems = notifiedResult.vineLastNotifiedItems || [];
-      updateMonitoringStatus(true, notifiedItems.length, config.queue, config.searchQuery);
-    } else {
-      // Stopping monitoring - send message to background service worker
-      await chrome.runtime.sendMessage({
-        action: 'stopMonitoring'
-      });
-
-      // Update button and status
-      const button = document.getElementById('toggle-monitoring-btn');
-      button.textContent = '▶️ Start Monitoring';
-      button.classList.remove('btn-red');
-      button.classList.add('btn-primary');
-
-      updateMonitoringStatus(false, 0, '', '');
-    }
-  } catch (error) {
-    console.error('Error toggling monitoring:', error);
-    alert('Error toggling monitoring. Please try again.');
-  }
-}
-
-async function saveMonitoringConfig() {
-  try {
-    // Get selected queue
-    const selectedRadio = document.querySelector('input[name="monitor-queue"]:checked');
-    const queue = selectedRadio ? selectedRadio.value : 'potluck';
-
-    // Get time unit and calculate seconds
-    const timeUnit = document.querySelector('input[name="time-unit"]:checked').value;
-    const sliderValue = parseInt(document.getElementById('refresh-interval').value);
-    const refreshIntervalSeconds = timeUnit === 'seconds' ? sliderValue : sliderValue * 60;
-
-    // Gather configuration from UI
-    const config = {
-      queue: queue,
-      refreshIntervalSeconds: refreshIntervalSeconds,
-      searchQuery: queue === 'search' ? document.getElementById('monitoring-search-query').value.trim() : ''
-    };
-
-    // Validate search query if search mode is selected
-    if (queue === 'search' && !config.searchQuery) {
-      alert('Please enter a search query for search mode.');
-      return null;
-    }
-
-    // Save to storage
-    await chrome.storage.local.set({ vineMonitoringConfig: config });
-    return config;
-  } catch (error) {
-    console.error('Error saving monitoring config:', error);
-    alert('Error saving configuration. Please try again.');
-    return null;
-  }
-}
-
-function updateMonitoringStatus(isEnabled, notifiedCount, queue, searchQuery) {
-  const statusElement = document.getElementById('monitoring-status');
-  const statusText = document.getElementById('monitoring-status-text');
-  const queueText = document.getElementById('monitoring-queue-text');
-  const notifiedCountElement = document.getElementById('monitoring-notified-count');
-  const button = document.getElementById('toggle-monitoring-btn');
-
-  if (isEnabled) {
-    statusElement.style.display = 'block';
-    statusText.textContent = '● Active';
-    statusText.style.color = '#10b981';
-    statusText.style.background = 'rgba(16, 185, 129, 0.2)';
-    notifiedCountElement.textContent = notifiedCount;
-    
-    // Update queue display
-    let queueDisplay = '';
-    switch(queue) {
-      case 'potluck':
-        queueDisplay = 'Potluck';
-        break;
-      case 'encore':
-        queueDisplay = 'Encore';
-        break;
-      case 'last_chance':
-        queueDisplay = 'Last Chance';
-        break;
-      case 'search':
-        queueDisplay = searchQuery ? `Search: ${searchQuery}` : 'Search';
-        break;
-      default:
-        queueDisplay = queue || 'Unknown';
-    }
-    queueText.textContent = queueDisplay;
-
-    button.textContent = '⏸️ Stop Monitoring';
-    button.classList.remove('btn-primary');
-    button.classList.add('btn-red');
-  } else {
-    statusElement.style.display = 'none';
-    button.textContent = '▶️ Start Monitoring';
-    button.classList.remove('btn-red');
-    button.classList.add('btn-primary');
   }
 }
 

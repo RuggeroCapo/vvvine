@@ -11,7 +11,7 @@ class AmazonVineEnhancer {
   }
 
   setupMessageListener() {
-    // Listen for messages from popup
+    // Listen for messages from popup and background
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (request.action === 'toggleAutoNavigation') {
         this.handleAutoNavigationToggle(request.enabled);
@@ -124,9 +124,33 @@ class AmazonVineEnhancer {
     }
   }
 
+  waitForInitialization() {
+    return new Promise((resolve) => {
+      if (this.isInitialized) {
+        resolve();
+        return;
+      }
+      
+      const checkInit = () => {
+        if (this.isInitialized) {
+          resolve();
+        } else {
+          setTimeout(checkInit, 100);
+        }
+      };
+      checkInit();
+    });
+  }
+
   async init() {
     
     try {
+      // Block NAVYAAN footer network requests immediately
+      this.blockFooterRequests();
+      
+      // Hide footer elements immediately and continuously
+      this.hideFooterElements();
+      
       // Wait for the grid to be available
       await this.waitForGrid();
       
@@ -148,15 +172,137 @@ class AmazonVineEnhancer {
   waitForGrid() {
     return new Promise((resolve) => {
       const checkGrid = () => {
+        // Check if we're on a Vine page (with or without products)
         const grid = document.getElementById('vvp-items-grid');
-        if (grid && grid.children.length > 0) {
-          resolve(grid);
+        const tabContent = document.querySelector('.vvp-tab-content');
+        
+        // Resolve if either the grid exists with items OR the tab content exists (even without items)
+        if ((grid && grid.children.length > 0) || tabContent) {
+          console.log('[Vine Enhancer] Page ready:', grid ? 'with products' : 'without products');
+          resolve(grid || tabContent);
         } else {
           setTimeout(checkGrid, 100);
         }
       };
       checkGrid();
     });
+  }
+
+  blockFooterRequests() {
+    // Block network requests to footer-related endpoints
+    const originalFetch = window.fetch;
+    const originalXHROpen = XMLHttpRequest.prototype.open;
+    
+    // Override fetch to block footer requests
+    window.fetch = function(url, options) {
+      if (typeof url === 'string' && (
+        url.includes('slot=navFooter') ||
+        url.includes('NAVYAAN') ||
+        url.includes('footer') ||
+        url.includes('rhf')
+      )) {
+        console.log('[Vine Enhancer] Blocked footer request:', url);
+        return Promise.reject(new Error('Footer request blocked by Vine Enhancer'));
+      }
+      return originalFetch.apply(this, arguments);
+    };
+    
+    // Override XMLHttpRequest to block footer requests
+    XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+      if (typeof url === 'string' && (
+        url.includes('slot=navFooter') ||
+        url.includes('NAVYAAN') ||
+        url.includes('footer') ||
+        url.includes('rhf')
+      )) {
+        console.log('[Vine Enhancer] Blocked XHR footer request:', url);
+        // Create a fake request that does nothing
+        this._blocked = true;
+        return;
+      }
+      return originalXHROpen.apply(this, arguments);
+    };
+    
+    // Override send to handle blocked requests
+    const originalXHRSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function(data) {
+      if (this._blocked) {
+        // Simulate a successful empty response
+        setTimeout(() => {
+          if (this.onreadystatechange) {
+            this.readyState = 4;
+            this.status = 200;
+            this.responseText = '';
+            this.onreadystatechange();
+          }
+        }, 1);
+        return;
+      }
+      return originalXHRSend.apply(this, arguments);
+    };
+  }
+
+  hideFooterElements() {
+    // Function to hide footer elements
+    const hideFooters = () => {
+      const footerSelectors = [
+        '#navFooter',
+        '[id*="navFooter"]',
+        '[class*="navFooter"]',
+        '[data-testid*="footer"]',
+        '.nav-footer',
+        '.navFooter',
+        'footer[role="contentinfo"]',
+        '#footer',
+        '.footer',
+        '[aria-label*="footer" i]',
+        '[aria-labelledby*="footer" i]',
+        '[id*="NAVYAAN"]',
+        '[class*="NAVYAAN"]',
+        '[data-testid*="NAVYAAN"]',
+        '#rhf',
+        '#rhf-container',
+        '.rhf-frame',
+        '[id*="rhf"]',
+        '[class*="rhf"]'
+      ];
+      
+      footerSelectors.forEach(selector => {
+        try {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach(element => {
+            element.style.display = 'none';
+            element.style.visibility = 'hidden';
+            element.style.opacity = '0';
+            element.style.height = '0';
+            element.style.overflow = 'hidden';
+            element.style.position = 'absolute';
+            element.style.left = '-9999px';
+            element.remove(); // Completely remove from DOM for better performance
+          });
+        } catch (e) {
+          // Ignore selector errors
+        }
+      });
+    };
+    
+    // Hide immediately
+    hideFooters();
+    
+    // Hide continuously with MutationObserver for dynamic content
+    const observer = new MutationObserver(() => {
+      hideFooters();
+    });
+    
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['id', 'class', 'data-testid']
+    });
+    
+    // Also run periodically as a fallback
+    setInterval(hideFooters, 1000);
   }
 
   async initializeManagers() {

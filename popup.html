@@ -75,102 +75,23 @@
       </div>
     </div>
 
-    <!-- Monitoring Card -->
+    <!-- Monitoring Info Card -->
     <div class="card">
       <div class="card-header">
         <div class="card-icon">🔔</div>
-        <h2 class="card-title">Monitoring Mode</h2>
+        <h2 class="card-title">Monitoring</h2>
       </div>
       <div class="card-content">
-        <p class="card-description">Monitor for new items with notifications</p>
-
-        <!-- Queue Selection -->
-        <div class="form-group">
-          <label class="form-label">Queue to Monitor</label>
-          <div class="radio-group">
-            <label class="radio-label">
-              <input type="radio" name="monitor-queue" value="potluck" id="monitor-potluck" checked class="radio-input">
-              <span>Potluck</span>
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="monitor-queue" value="encore" id="monitor-encore" class="radio-input">
-              <span>Encore</span>
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="monitor-queue" value="last_chance" id="monitor-last-chance" class="radio-input">
-              <span>Last Chance</span>
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="monitor-queue" value="search" id="monitor-search" class="radio-input">
-              <span>Search</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Search Query -->
-        <div id="search-query-container" class="form-group" style="display: none;">
-          <label class="form-label" for="monitoring-search-query">Search Query</label>
-          <input type="text" id="monitoring-search-query" placeholder="e.g., headphones, gaming" class="text-input">
-        </div>
-
-        <!-- Refresh Interval -->
-        <div class="form-group">
-          <label class="form-label">
-            <span>Refresh Interval</span>
-            <span class="form-label-value" id="refresh-interval-display">5min</span>
-          </label>
-          
-          <!-- Time Unit Selection -->
-          <div class="time-unit-selector">
-            <label class="time-unit-option">
-              <input type="radio" name="time-unit" value="seconds" id="time-unit-seconds" class="time-unit-radio">
-              <span>Seconds</span>
-            </label>
-            <label class="time-unit-option">
-              <input type="radio" name="time-unit" value="minutes" id="time-unit-minutes" class="time-unit-radio" checked>
-              <span>Minutes</span>
-            </label>
-          </div>
-          
-          <input type="range" id="refresh-interval" min="5" max="30" value="5" step="1" class="range-input">
-          <div class="range-labels">
-            <span id="range-min-label">1min</span>
-            <span id="range-max-label">30min</span>
-          </div>
-        </div>
-
-        <!-- Start/Stop Button -->
-        <button id="toggle-monitoring-btn" class="btn btn-primary">
-          <span class="btn-icon">▶️</span>
-          Start Monitoring
-        </button>
-
-        <!-- Monitoring Status -->
-        <div id="monitoring-status" class="monitoring-status" style="display: none;">
-          <div class="status-grid">
-            <div class="status-item">
-              <span class="status-label">Status</span>
-              <span id="monitoring-status-text" class="status-badge status-active">● Active</span>
-            </div>
-            <div class="status-item">
-              <span class="status-label">Monitoring</span>
-              <span id="monitoring-queue-text" class="status-value">Potluck</span>
-            </div>
-            <div class="status-item">
-              <span class="status-label">Items Notified</span>
-              <span id="monitoring-notified-count" class="status-value">0</span>
-            </div>
-          </div>
-          <div class="button-row">
-            <button id="test-notification" class="btn btn-small btn-primary">
-              <span class="btn-icon">🔔</span>
-              Test
-            </button>
-            <button id="clear-notified" class="btn btn-small btn-orange">
-              <span class="btn-icon">🗑️</span>
-              Clear
-            </button>
-          </div>
+        <p class="card-description">Monitoring controls are now on the Vine page itself. Look for the Monitor button in the control panel on any Vine page.</p>
+        <div class="button-row">
+          <button id="test-notification" class="btn btn-small btn-primary">
+            <span class="btn-icon">🔔</span>
+            Test Notification
+          </button>
+          <button id="clear-notified" class="btn btn-small btn-orange">
+            <span class="btn-icon">🗑️</span>
+            Clear Notified
+          </button>
         </div>
       </div>
     </div>
