@@ -20,7 +20,8 @@
     "*://*.amazon.it/*",
     "*://*.amazon.ca/*",
     "*://*.amazon.com.au/*",
-    "*://*.amazon.co.jp/*"
+    "*://*.amazon.co.jp/*",
+    "*://api.v-helper.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -60,7 +61,6 @@
         "managers/category-tracker-manager.js",
         "managers/notification-provider-manager.js",
         "managers/monitoring-manager.js",
-        "managers/purchase-manager.js",
         "managers/keyboard-manager.js",
         "managers/page-manager.js",
         "content.js"

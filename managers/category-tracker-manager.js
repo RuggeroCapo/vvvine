@@ -42,6 +42,10 @@ class CategoryTrackerManager extends BaseManager {
     return url.searchParams.get('queue') === 'encore';
   }
 
+  isExtensionContextInvalidated(error) {
+    return error && error.message && error.message.includes('Extension context invalidated');
+  }
+
   async trackCategories() {
     if (this.isTracking) {
       console.log('CategoryTrackerManager: Already tracking, skipping');
@@ -142,8 +146,13 @@ class CategoryTrackerManager extends BaseManager {
       
       this.previousCounts = new Map(Object.entries(storedCounts));
     } catch (error) {
-      console.error('CategoryTrackerManager: Error loading previous counts:', error);
-      this.previousCounts = new Map();
+      if (this.isExtensionContextInvalidated(error)) {
+        console.warn('CategoryTrackerManager: Extension context invalidated, using empty counts');
+        this.previousCounts = new Map();
+      } else {
+        console.error('CategoryTrackerManager: Error loading previous counts:', error);
+        this.previousCounts = new Map();
+      }
     }
   }
 
@@ -153,7 +162,13 @@ class CategoryTrackerManager extends BaseManager {
       await chrome.storage.local.set({ vineCategoryCounts: countsObject });
       this.previousCounts = new Map(counts);
     } catch (error) {
-      console.error('CategoryTrackerManager: Error saving counts:', error);
+      if (this.isExtensionContextInvalidated(error)) {
+        console.warn('CategoryTrackerManager: Extension context invalidated, cannot save counts. Please reload the page.');
+        // Still update in-memory counts for current session
+        this.previousCounts = new Map(counts);
+      } else {
+        console.error('CategoryTrackerManager: Error saving counts:', error);
+      }
     }
   }
 
@@ -233,7 +248,12 @@ class CategoryTrackerManager extends BaseManager {
       this.emit('categoryCountsReset');
       
     } catch (error) {
-      console.error('CategoryTrackerManager: Error resetting counts:', error);
+      if (error.message && error.message.includes('Extension context invalidated')) {
+        console.warn('CategoryTrackerManager: Extension was reloaded. Please refresh the page.');
+        alert('Extension was reloaded. Please refresh the page to continue.');
+      } else {
+        console.error('CategoryTrackerManager: Error resetting counts:', error);
+      }
     }
   }
 

@@ -43,14 +43,8 @@ class AmazonVineEnhancer {
           .then(() => sendResponse({ success: true }))
           .catch(error => sendResponse({ success: false, error: error.message }));
         return true; // Keep channel open for async response
-      } else if (request.action === 'refreshAddresses' ||
-                 request.action === 'getAddresses' ||
-                 request.action === 'setRocketEnabled') {
-        // These are handled by PurchaseManager's listener
-        // Return true to indicate we'll respond asynchronously (even though we won't)
-        // This prevents closing the channel so PurchaseManager can respond
-        return true;
       }
+
       return false; // Close channel for sync responses
     });
   }
@@ -316,7 +310,6 @@ class AmazonVineEnhancer {
     this.managers.categoryTracker = new CategoryTrackerManager();
     this.managers.notificationProvider = new NotificationProviderManager();
     this.managers.monitoring = new MonitoringManager();
-    this.managers.purchase = new PurchaseManager();
     this.managers.ui = new UIManager();
     this.managers.keyboard = new KeyboardManager();
     this.managers.page = new PageManager();
@@ -349,16 +342,10 @@ class AmazonVineEnhancer {
       this.managers.monitoring.setPageDetectionManager(this.managers.pageDetection);
     }
 
-    // Setup purchase manager dependencies
-    if (this.managers.purchase) {
-      this.managers.purchase.setStorageManager(this.managers.storage);
-    }
-
     // Expose managers globally for early access (before full initialization completes)
     // Note: These are exposed early but may not be fully initialized until startManagers() completes
     window.vineNotificationProvider = this.managers.notificationProvider;
     window.vineMonitoringManager = this.managers.monitoring;
-    window.vinePurchaseManager = this.managers.purchase;
     
     // Special keyboard manager event handling for seen items
     window.vineEventBus.on('toggleItemSeen', (data) => {
@@ -434,7 +421,6 @@ class AmazonVineEnhancer {
     window.vineNewItemsManager = this.managers.newItems;
     window.vineMonitoringManager = this.managers.monitoring;
     window.vineNotificationProvider = this.managers.notificationProvider;
-    window.vinePurchaseManager = this.managers.purchase;
   }
 
   async startManagers() {
@@ -449,7 +435,6 @@ class AmazonVineEnhancer {
       'categoryTracker',     // Depends on storage, pageDetection
       'notificationProvider',// Independent
       'monitoring',          // Depends on storage, newItems, pageDetection, notificationProvider
-      'purchase',            // Depends on storage
       'ui',                  // Needs to be available for status updates
       'keyboard',            // Coordinates with other managers
       'page'                 // Independent

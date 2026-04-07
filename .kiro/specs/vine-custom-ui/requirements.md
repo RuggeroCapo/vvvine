@@ -78,15 +78,13 @@ Implementare un'interfaccia utente personalizzata per Amazon Vine che sostituisc
 
 ### Requirement 6
 
-**User Story:** Come utente, voglio che l'estensione mantenga le funzionalità esistenti (filtri, color coding, rocket button), così non perdo le feature già implementate.
+**User Story:** Come utente, voglio che l'estensione mantenga le funzionalità esistenti (filtri, color coding), così non perdo le feature già implementate.
 
 #### Acceptance Criteria
 
 1. WHEN la CustomUI è attiva THEN il VineSystem SHALL applicare il color coding agli ItemTile (verde per nuovi, blu per target)
-2. WHEN un ItemTile è renderizzato THEN il VineSystem SHALL aggiungere il rocket button se disponibile
-3. WHEN i filtri sono applicati THEN il VineSystem SHALL filtrare gli ItemTile nella CustomUI
-4. WHEN un item è ordinato THEN il VineSystem SHALL aggiornare lo stato e rimuovere l'ItemTile dalla griglia
-5. WHEN la CustomUI è attiva THEN il VineSystem SHALL mantenere il tracking delle categorie e seen items
+2. WHEN i filtri sono applicati THEN il VineSystem SHALL filtrare gli ItemTile nella CustomUI
+3. WHEN la CustomUI è attiva THEN il VineSystem SHALL mantenere il tracking delle categorie e seen items
 
 ### Requirement 7
 
@@ -174,7 +172,7 @@ Implementare un'interfaccia utente personalizzata per Amazon Vine che sostituisc
 
 ## Dependencies
 
-- Existing managers: storage, seen-items, filter, ui, new-items, purchase, color-coding
+- Existing managers: storage, seen-items, filter, ui, new-items, color-coding
 - Amazon Vine API endpoints (read-only)
 - DOMParser API per parsing HTML
 - Intersection Observer API per lazy loading

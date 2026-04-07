@@ -244,148 +244,9 @@
 
 ---
 
-## Phase 4: Purchase Feature (Rocket Button)
+## Phase 4: Configuration UI
 
-### Task 4.1: Create PurchaseManager - Core
-**Priority:** High
-**Estimated Time:** 4 hours
-
-**Subtasks:**
-- [ ] Create `managers/purchase-manager.js` extending BaseManager
-- [ ] Implement `getCsrfToken()` to extract from page:
-  - Try `input[name="csrf-token"]`
-  - Try JSON in `.vvp-body > [type='a-state']`
-- [ ] Implement `getSelectedAddress()` from storage
-- [ ] Implement `setSelectedAddress(addressId, legacyAddressId)` to storage
-- [ ] Implement `async resolveParentAsin(recommendationId)`:
-  - GET `/vine/api/recommendations/{encodedId}`
-  - Extract `data.result.variations[0].asin`
-  - Handle errors
-- [ ] Implement `async executePurchase(recommendationId, asin, isParent)`:
-  - Resolve parent ASIN if needed
-  - Validate all required data
-  - POST to `/vine/api/voiceOrders` with payload
-  - Check response for `orderId`
-  - Return success/failure
-- [ ] Add storage keys: `vinePurchaseAddressId`, `vinePurchaseLegacyAddressId`
-- [ ] Add error handling for all API calls
-- [ ] Add logging for debugging
-
-**Acceptance:**
-- CSRF token extracted correctly
-- Parent ASIN resolution works
-- Purchase API call succeeds
-- Errors handled gracefully
-
----
-
-### Task 4.2: Create PurchaseManager - UI Components
-**Priority:** High
-**Estimated Time:** 3 hours
-
-**Subtasks:**
-- [ ] Implement `createRocketButton(tile, asin, recommendationId, isParent)`:
-  - Create button element with 🚀 emoji
-  - Position absolute top-right (10px, 10px)
-  - Size 35px × 35px circle
-  - Background: #d7f540 (child) or #f5a52f (parent)
-  - Add click handler
-  - Only on Potluck, Encore, Last Chance queues
-- [ ] Implement `showConfirmationDialog(title, asin)`:
-  - Create modal overlay
-  - Show item title (first 4 words)
-  - Show ASIN
-  - Confirm/Cancel buttons
-  - Keyboard shortcuts (Enter/Escape)
-  - Focus trap
-  - Return promise (resolve on confirm, reject on cancel)
-- [ ] Implement `handlePurchaseClick(tile, asin, recommendationId, isParent)`:
-  - Show confirmation dialog
-  - If confirmed, execute purchase
-  - Show result popup
-  - Disable button on success
-- [ ] Add button hover/active states
-- [ ] Add loading state during purchase
-
-**Acceptance:**
-- Rocket button appears on correct pages
-- Styled correctly (parent vs child)
-- Confirmation dialog works
-- Keyboard shortcuts functional
-
----
-
-### Task 4.3: Add Purchase Styles
-**Priority:** High
-**Estimated Time:** 1 hour
-
-**Subtasks:**
-- [ ] Add `.vine-rocket-button` styles to `styles.css`
-- [ ] Add `.vine-rocket-button-parent` variant
-- [ ] Add `.vine-rocket-button-child` variant
-- [ ] Add hover/active/disabled states
-- [ ] Add `.vine-purchase-dialog` modal styles
-- [ ] Add `.vine-purchase-dialog-overlay` backdrop
-- [ ] Add `.vine-purchase-dialog-content` content box
-- [ ] Add button styles for confirm/cancel
-- [ ] Add animations (fade-in, scale)
-- [ ] Test on different screen sizes
-
-**Acceptance:**
-- Rocket button styled correctly
-- Dialog centered and styled
-- Animations smooth
-- Responsive design
-
----
-
-### Task 4.4: Integrate PurchaseManager
-**Priority:** High
-**Estimated Time:** 2 hours
-
-**Subtasks:**
-- [ ] Import PurchaseManager in content.js
-- [ ] Add to initialization order (after storage, UI, popup notification)
-- [ ] Set up dependencies (StorageManager, PopupNotificationManager)
-- [ ] Process all items to add rocket buttons
-- [ ] Handle dynamically added items (MutationObserver)
-- [ ] Add to manifest.json
-- [ ] Test on all queue types
-- [ ] Test purchase flow end-to-end
-
-**Acceptance:**
-- Manager initializes correctly
-- Buttons appear on all items
-- Purchase flow works
-- No console errors
-
----
-
-### Task 4.5: Address Selection UI
-**Priority:** Medium
-**Estimated Time:** 2 hours
-
-**Subtasks:**
-- [ ] Extract available addresses from page (`.vvp-address-option`)
-- [ ] Create address dropdown in control panel
-- [ ] Populate dropdown with addresses
-- [ ] Load selected address from storage
-- [ ] Save selection on change
-- [ ] Pass selected address to PurchaseManager
-- [ ] Handle case when no address selected
-- [ ] Test with multiple addresses
-
-**Acceptance:**
-- Dropdown shows all addresses
-- Selection persists across pages
-- Purchase uses selected address
-- Error shown if no address selected
-
----
-
-## Phase 5: Configuration UI
-
-### Task 5.1: Add Target Configuration to Popup
+### Task 4.1: Add Target Configuration to Popup
 **Priority:** Medium
 **Estimated Time:** 2 hours
 
@@ -408,27 +269,7 @@
 
 ---
 
-### Task 5.2: Add Purchase Settings to Popup
-**Priority:** Medium
-**Estimated Time:** 1 hour
-
-**Subtasks:**
-- [ ] Add "Purchase Settings" section to `popup.html`
-- [ ] Add address dropdown (populated from page)
-- [ ] Add "Enable Rocket Button" checkbox
-- [ ] Implement toggle handler in `popup.js`
-- [ ] Save setting to storage
-- [ ] Show/hide rocket buttons based on setting
-- [ ] Add help text explaining one-click purchase
-
-**Acceptance:**
-- Settings render correctly
-- Toggle works
-- Buttons show/hide appropriately
-
----
-
-### Task 5.3: Add Category Tracking Settings to Popup
+### Task 4.2: Add Category Tracking Settings to Popup
 **Priority:** Low
 **Estimated Time:** 1 hour
 
@@ -448,9 +289,9 @@
 
 ---
 
-## Phase 6: Polish & Testing
+## Phase 5: Performance & Testing
 
-### Task 6.1: Performance Optimization
+### Task 5.1: Performance Optimization
 **Priority:** Medium
 **Estimated Time:** 2 hours
 
@@ -458,8 +299,6 @@
 - [ ] Profile color coding performance
 - [ ] Batch DOM updates where possible
 - [ ] Debounce category tracking (500ms)
-- [ ] Cache CSRF token (reuse for 5 minutes)
-- [ ] Lazy load rocket buttons (IntersectionObserver)
 - [ ] Throttle popup creation
 - [ ] Clear old timestamps (> 5 minutes)
 - [ ] Measure and log performance metrics
@@ -467,23 +306,18 @@
 **Acceptance:**
 - Color coding < 100ms
 - Category tracking < 50ms
-- Rocket buttons < 200ms
 - No memory leaks
 
 ---
 
-### Task 6.2: Error Handling & Edge Cases
+### Task 5.2: Error Handling & Edge Cases
 **Priority:** High
 **Estimated Time:** 2 hours
 
 **Subtasks:**
-- [ ] Handle missing CSRF token gracefully
-- [ ] Handle expired CSRF token (refresh and retry)
-- [ ] Handle network failures in purchase
-- [ ] Handle invalid address selection
-- [ ] Handle parent ASIN resolution failure
-- [ ] Handle API error responses
 - [ ] Handle DOM structure changes
+- [ ] Handle network failures gracefully
+- [ ] Handle API error responses
 - [ ] Add user-friendly error messages
 - [ ] Log errors for debugging
 
@@ -494,14 +328,13 @@
 
 ---
 
-### Task 6.3: Accessibility Improvements
+### Task 5.3: Accessibility Improvements
 **Priority:** Medium
 **Estimated Time:** 2 hours
 
 **Subtasks:**
-- [ ] Add aria-labels to rocket buttons
+- [ ] Add aria-labels to interactive elements
 - [ ] Add aria-live regions for popups
-- [ ] Ensure dialog focus trap works
 - [ ] Test keyboard navigation
 - [ ] Add text indicators for colors (not just color)
 - [ ] Test with screen reader

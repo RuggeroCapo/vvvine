@@ -720,7 +720,7 @@ kbd {
   transition: all 0.2s ease;
 }
 
-/* Rocket Button Card Specific Styles */
+/* Form Group Spacing */
 .card .toggle-container + .form-group {
   margin-top: 16px;
 }

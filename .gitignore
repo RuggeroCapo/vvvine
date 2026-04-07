@@ -10,6 +10,8 @@ dist/styles.css
 .DS_Store
 .vscode/
 *.log
+.env
+*.env
 
 # Package manager files
 package-lock.json

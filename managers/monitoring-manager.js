@@ -1,6 +1,18 @@
 // Monitoring Manager - Monitors for new items and sends notifications
 // Uses ItemsRepository for data persistence
 // Uses in-page fetch to check queues without navigation
+window.VINE_DEFAULT_SOCKET_URL = window.VINE_DEFAULT_SOCKET_URL || (
+  'wss://api.v-helper.com/socket.io/'
+  + '?app_version=3.10.10'
+  + '&countryCode=it'
+  + '&uuid=639e138a-0e43-11f1-9839-fa163effef06'
+  + '&fid=58259'
+  + '&cid=7f1cf6cd0ee4ee0339d1ae05ce67ffc9c95f414b46c987b46b8c3f49f53f2312'
+  + '&device_name=Pumping%20Micro%20Zeppelin%20S-339'
+  + '&EIO=4'
+  + '&transport=websocket'
+);
+
 class MonitoringManager extends BaseManager {
   constructor(config) {
     super(config);
@@ -10,12 +22,18 @@ class MonitoringManager extends BaseManager {
     this.newItemsManager = null;
     this.pageDetectionManager = null;
     this.monitoringTimer = null;
+    this.socket = null;
+    this.socketReconnectTimer = null;
+    this.socketEngineConnected = false;
+    this.socketNamespaceConnected = false;
 
     // Configuration
     this.config = {
       queues: ['potluck', 'encore', 'last_chance'],  // Which queues to monitor
       searchQuery: '',                                // Search query (only for search mode)
-      refreshIntervalSeconds: 300                     // How often to check (default: 5 min)
+      refreshIntervalSeconds: 300,                    // How often to check (default: 5 min)
+      transportMode: 'polling',                       // polling | socket
+      socketUrl: window.VINE_DEFAULT_SOCKET_URL       // Socket endpoint for advanced mode
     };
 
     // Base URL for Amazon Vine (detect from current page)
@@ -41,14 +59,42 @@ class MonitoringManager extends BaseManager {
   }
 
   async setup() {
+    console.log('[MonitoringManager] setup() called');
+    
     // Initialize repository if not already initialized
     if (!this.repository.isInitialized) {
+      console.log('[MonitoringManager] Initializing repository...');
       await this.repository.init();
     }
 
     await this.loadConfiguration();
     this.setupEventListeners();
     await this.loadMonitoringState();
+    
+    // Add diagnostic function to window for debugging
+    window.vineMonitoringDiagnostics = () => {
+      console.log('=== Vine Monitoring Diagnostics ===');
+      console.log('Is Monitoring:', this.isMonitoring);
+      console.log('Config:', this.config);
+      console.log('Notification Provider:', this.notificationProvider ? 'Set' : 'NOT SET');
+      console.log('New Items Manager:', this.newItemsManager ? 'Set' : 'NOT SET');
+      console.log('Page Detection Manager:', this.pageDetectionManager ? 'Set' : 'NOT SET');
+      console.log('Timer Active:', this.monitoringTimer ? 'Yes' : 'No');
+      console.log('Repository Initialized:', this.repository?.isInitialized);
+      console.log('Event Listeners:', window.vineEventBus?.events.has('startMonitoring') ? 
+        `${window.vineEventBus.events.get('startMonitoring').length} listener(s)` : 'None');
+      console.log('===================================');
+      return {
+        isMonitoring: this.isMonitoring,
+        config: this.config,
+        hasNotificationProvider: !!this.notificationProvider,
+        hasNewItemsManager: !!this.newItemsManager,
+        hasTimer: !!this.monitoringTimer,
+        repositoryInitialized: this.repository?.isInitialized
+      };
+    };
+    
+    console.log('[MonitoringManager] setup() complete. Run vineMonitoringDiagnostics() in console for status.');
   }
 
   async loadConfiguration() {
@@ -71,6 +117,16 @@ class MonitoringManager extends BaseManager {
           sessionStorage.setItem('vineMonitoringConfig', JSON.stringify(config));
         }
 
+        if (!config.transportMode || !['polling', 'socket'].includes(config.transportMode)) {
+          config.transportMode = 'polling';
+          sessionStorage.setItem('vineMonitoringConfig', JSON.stringify(config));
+        }
+
+        if (typeof config.socketUrl !== 'string') {
+          config.socketUrl = window.VINE_DEFAULT_SOCKET_URL;
+          sessionStorage.setItem('vineMonitoringConfig', JSON.stringify(config));
+        }
+
         this.config = { ...this.config, ...config };
       }
     } catch (error) {
@@ -88,8 +144,15 @@ class MonitoringManager extends BaseManager {
   }
 
   setupEventListeners() {
-    this.on('startMonitoring', (config) => this.startMonitoring(config));
-    this.on('stopMonitoring', () => this.stopMonitoring());
+    console.log('[MonitoringManager] Setting up event listeners');
+    this.on('startMonitoring', (config) => {
+      console.log('[MonitoringManager] Received startMonitoring event');
+      this.startMonitoring(config);
+    });
+    this.on('stopMonitoring', () => {
+      console.log('[MonitoringManager] Received stopMonitoring event');
+      this.stopMonitoring();
+    });
   }
 
   async loadMonitoringState() {
@@ -98,15 +161,19 @@ class MonitoringManager extends BaseManager {
     this.isMonitoring = monitoringEnabled === 'true';
 
     if (this.isMonitoring) {
-      // Start the timer to resume monitoring
-      this.startMonitoringTimer();
-
       // Emit event for UI update
       this.emit('monitoringStateChanged', { isMonitoring: true, config: this.config });
+      if (this.isSocketMode()) {
+        console.log('[MonitoringManager] Resuming socket monitoring...');
+        this.startSocketConnection();
+      } else {
+        // Start the timer to resume monitoring
+        this.startMonitoringTimer();
 
-      // Perform initial check on page load
-      console.log('[MonitoringManager] Resuming monitoring, performing initial check...');
-      await this.checkAllQueues();
+        // Perform initial check on page load
+        console.log('[MonitoringManager] Resuming monitoring, performing initial check...');
+        await this.checkAllQueues();
+      }
     } else {
       // Emit event for UI to show correct initial state
       this.emit('monitoringStateChanged', { isMonitoring: false, config: this.config });
@@ -114,63 +181,104 @@ class MonitoringManager extends BaseManager {
   }
 
   async startMonitoring(config = null) {
+    console.log('[MonitoringManager] startMonitoring called with config:', config);
+    
     if (this.isMonitoring) {
+      console.log('[MonitoringManager] Already monitoring, ignoring start request');
       return;
     }
 
     // Update config if provided
     if (config) {
+      console.log('[MonitoringManager] Updating config:', config);
       this.config = { ...this.config, ...config };
       await this.saveConfiguration();
     }
 
     // Validate dependencies
     if (!this.notificationProvider) {
-      console.error('MonitoringManager: Cannot start - notification provider not set');
+      console.error('[MonitoringManager] Cannot start - notification provider not set');
+      alert('Cannot start monitoring: Notification provider not configured. Please check your notification settings.');
       return;
     }
 
     if (!this.newItemsManager) {
-      console.error('MonitoringManager: Cannot start - new items manager not set');
+      console.error('[MonitoringManager] Cannot start - new items manager not set');
+      alert('Cannot start monitoring: New items manager not initialized. Please refresh the page.');
       return;
     }
 
+    if (this.isSocketMode() && !this.config.socketUrl) {
+      console.error('[MonitoringManager] Cannot start socket monitoring without socket URL');
+      alert('Cannot start socket monitoring: socket URL is missing.');
+      return;
+    }
+
+    console.log('[MonitoringManager] All dependencies validated, starting monitoring...');
     this.isMonitoring = true;
     // Use sessionStorage for per-tab independent monitoring state
     sessionStorage.setItem('vineMonitoringEnabled', 'true');
+    console.log('[MonitoringManager] Emitting monitoringStateChanged event');
     this.emit('monitoringStateChanged', { isMonitoring: true, config: this.config });
 
     // Send start notification
     const queueLabel = this.getQueueLabel();
-    await this.sendNotification({
-      title: 'Vine Monitoring Started',
-      message: `Monitoring ${queueLabel} every ${this.config.refreshIntervalSeconds}s`,
-      priority: 'low',
-      tags: ['vine', 'monitoring', 'start']
-    });
+    const monitoringModeLabel = this.getMonitoringModeLabel();
+    console.log('[MonitoringManager] Sending start notification for:', queueLabel);
+    try {
+      await this.sendNotification({
+        title: 'Vine Monitoring Started',
+        message: this.isSocketMode()
+          ? `Monitoring ${queueLabel} via ${monitoringModeLabel}`
+          : `Monitoring ${queueLabel} via ${monitoringModeLabel} every ${this.config.refreshIntervalSeconds}s`,
+        priority: 'low',
+        tags: ['vine', 'monitoring', 'start']
+      });
+      console.log('[MonitoringManager] Start notification sent successfully');
+    } catch (error) {
+      console.error('[MonitoringManager] Failed to send start notification:', error);
+    }
 
-    // Start in-page monitoring timer
-    this.startMonitoringTimer();
+    if (this.isSocketMode()) {
+      console.log('[MonitoringManager] Starting socket monitoring...');
+      this.startSocketConnection();
+    } else {
+      // Start in-page monitoring timer
+      console.log('[MonitoringManager] Starting monitoring timer...');
+      this.startMonitoringTimer();
 
-    // Do an immediate check
-    console.log('[MonitoringManager] Starting immediate check...');
-    await this.checkAllQueues();
+      // Do an immediate check
+      console.log('[MonitoringManager] Starting immediate check...');
+      try {
+        await this.checkAllQueues();
+        console.log('[MonitoringManager] Immediate check completed');
+      } catch (error) {
+        console.error('[MonitoringManager] Error during immediate check:', error);
+      }
+    }
   }
 
   async stopMonitoring() {
+    console.log('[MonitoringManager] stopMonitoring called');
+    
     if (!this.isMonitoring) {
+      console.log('[MonitoringManager] Not currently monitoring, ignoring stop request');
       return;
     }
 
+    console.log('[MonitoringManager] Stopping monitoring...');
     this.isMonitoring = false;
     // Use sessionStorage for per-tab independent monitoring state
     sessionStorage.setItem('vineMonitoringEnabled', 'false');
+    console.log('[MonitoringManager] Emitting monitoringStateChanged event');
     this.emit('monitoringStateChanged', { isMonitoring: false, config: this.config });
 
     // Stop the monitoring timer
+    console.log('[MonitoringManager] Stopping monitoring timer...');
     this.stopMonitoringTimer();
+    this.disconnectSocket();
 
-    console.log('MonitoringManager: Monitoring stopped');
+    console.log('[MonitoringManager] Monitoring stopped successfully');
   }
 
   startMonitoringTimer() {
@@ -198,6 +306,14 @@ class MonitoringManager extends BaseManager {
     }
   }
 
+  isSocketMode() {
+    return this.config.transportMode === 'socket';
+  }
+
+  getMonitoringModeLabel() {
+    return this.isSocketMode() ? 'socket stream' : 'polling';
+  }
+
   // Check all configured queues using fetch (no navigation)
   async checkAllQueues() {
     if (!this.isMonitoring) {
@@ -207,7 +323,6 @@ class MonitoringManager extends BaseManager {
     console.log('[MonitoringManager] ========== checkAllQueues START ==========');
     console.log('[MonitoringManager] Queues to check:', this.config.queues);
 
-    const allNewItems = [];
     const queuesChecked = [];
 
     // Check all queues in parallel for speed
@@ -233,66 +348,122 @@ class MonitoringManager extends BaseManager {
 
     const results = await Promise.all(checkPromises);
 
+    const discoveredItems = [];
+
     // Process results and find new items
     for (const result of results) {
       if (result.error) continue;
 
       queuesChecked.push(result.queue);
+      discoveredItems.push(...result.items.map(item => ({ ...item, queue: result.queue })));
+    }
 
-      for (const item of result.items) {
-        const existingDoc = this.repository.get(item.asin);
+    const { newItems } = await this.processDetectedItems(discoveredItems, queuesChecked);
 
-        if (!existingDoc) {
-          // Brand new item
-          const newDoc = {
-            asin: item.asin,
-            title: item.title || '',
-            imageUrl: item.imageUrl || '',
-            url: item.url || '',
-            firstSeenOn: Date.now(),
-            lastSeenOn: Date.now(),
-            seen: true,
-            hidden: false,
-            notified: false,
-            queue: result.queue
-          };
-          this.repository.items.set(item.asin, newDoc);
-          allNewItems.push({ ...newDoc, queue: result.queue });
-        } else {
-          // Update existing item
-          existingDoc.lastSeenOn = Date.now();
-          existingDoc.seen = true;
+    console.log('[MonitoringManager] Total new items found:', newItems.length);
+    console.log('[MonitoringManager] Queues checked:', queuesChecked);
 
-          // Check if this is a "new" item (not notified, not hidden)
-          if (!existingDoc.notified && !existingDoc.hidden) {
-            allNewItems.push({ ...existingDoc, queue: result.queue });
-          }
+    console.log('[MonitoringManager] ========== checkAllQueues END ==========');
+
+    return { newItems, queuesChecked };
+  }
+
+  async processDetectedItems(items, queuesChecked = []) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return { newItems: [], queuesChecked };
+    }
+
+    const allNewItems = [];
+    const uniqueQueues = new Set((queuesChecked || []).filter(Boolean));
+    let hasRepositoryChanges = false;
+
+    for (const item of items) {
+      if (!item?.asin) {
+        continue;
+      }
+
+      const currentTime = Date.now();
+      const itemQueue = item.queue || 'unknown';
+      uniqueQueues.add(itemQueue);
+
+      const existingDoc = this.repository.get(item.asin);
+
+      if (!existingDoc) {
+        const newDoc = {
+          asin: item.asin,
+          title: item.title || '',
+          imageUrl: item.imageUrl || '',
+          url: item.url || '',
+          firstSeenOn: currentTime,
+          lastSeenOn: currentTime,
+          seen: true,
+          hidden: false,
+          notified: false,
+          queue: itemQueue
+        };
+
+        this.repository.items.set(item.asin, newDoc);
+        hasRepositoryChanges = true;
+        allNewItems.push({ ...newDoc, queue: itemQueue, tileElement: item.tileElement, source: item.source || 'polling', reason: item.reason || '' });
+        continue;
+      }
+
+      let existingDocChanged = false;
+
+      if (existingDoc.lastSeenOn !== currentTime) {
+        existingDoc.lastSeenOn = currentTime;
+        existingDocChanged = true;
+      }
+      if (existingDoc.seen !== true) {
+        existingDoc.seen = true;
+        existingDocChanged = true;
+      }
+      if (itemQueue && existingDoc.queue !== itemQueue) {
+        existingDoc.queue = itemQueue;
+        existingDocChanged = true;
+      }
+      if (item.title && existingDoc.title !== item.title) {
+        existingDoc.title = item.title;
+        existingDocChanged = true;
+      }
+      if (item.imageUrl && existingDoc.imageUrl !== item.imageUrl) {
+        existingDoc.imageUrl = item.imageUrl;
+        existingDocChanged = true;
+      }
+      if (item.url && existingDoc.url !== item.url) {
+        existingDoc.url = item.url;
+        existingDocChanged = true;
+      }
+
+      if (existingDocChanged) {
+        hasRepositoryChanges = true;
+      }
+
+      if (!existingDoc.notified && !existingDoc.hidden) {
+        allNewItems.push({ ...existingDoc, queue: itemQueue, tileElement: item.tileElement, source: item.source || 'polling', reason: item.reason || '' });
+      }
+    }
+
+    if (allNewItems.length > 0) {
+      for (const item of allNewItems) {
+        const doc = this.repository.get(item.asin);
+        if (doc && !doc.notified) {
+          doc.notified = true;
+          hasRepositoryChanges = true;
         }
       }
     }
 
-    // Save repository changes
-    if (allNewItems.length > 0 || queuesChecked.length > 0) {
+    if (hasRepositoryChanges) {
       await this.repository.save();
     }
 
-    console.log('[MonitoringManager] Total new items found:', allNewItems.length);
-    console.log('[MonitoringManager] Queues checked:', queuesChecked);
-
-    // Send notification if there are new items
     if (allNewItems.length > 0) {
-      // Mark all as notified
-      for (const item of allNewItems) {
-        await this.repository.setNotified(item.asin, true);
-      }
-
-      // Send aggregated notification
-      await this.notifyAboutNewItemsMultiQueue(allNewItems, queuesChecked);
+      this.injectNewItemTiles(allNewItems);
+      await this.notifyAboutNewItemsMultiQueue(allNewItems, Array.from(uniqueQueues));
     }
 
-    console.log('[MonitoringManager] ========== checkAllQueues END ==========');
-
-    return { newItems: allNewItems, queuesChecked };
+    return { newItems: allNewItems, queuesChecked: Array.from(uniqueQueues) };
   }
 
   // Fetch HTML from a queue URL
@@ -312,6 +483,7 @@ class MonitoringManager extends BaseManager {
   }
 
   // Parse items from HTML string using DOMParser
+  // Returns both item data and the raw tile DOM elements for injection
   parseItemsFromHtml(html, queue) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
@@ -341,6 +513,14 @@ class MonitoringManager extends BaseManager {
         }
       }
 
+      // Fix relative URLs in the tile element for injection
+      if (titleElement && !titleElement.getAttribute('href')?.startsWith('http')) {
+        const baseMatch = this.baseUrl.match(/(https:\/\/www\.amazon\.[^/]+)/);
+        if (baseMatch) {
+          titleElement.setAttribute('href', baseMatch[1] + titleElement.getAttribute('href'));
+        }
+      }
+
       // Extract image URL
       const imageUrl = tile.querySelector('img')?.getAttribute('src') || '';
 
@@ -349,11 +529,331 @@ class MonitoringManager extends BaseManager {
         title,
         url,
         imageUrl,
-        queue
+        queue,
+        tileElement: tile  // Keep reference to the parsed tile DOM element
       });
     }
 
     return items;
+  }
+
+  // Inject new item tiles into the current page's grid without refreshing
+  injectNewItemTiles(newItems) {
+    const grid = document.getElementById('vvp-items-grid');
+    if (!grid) {
+      console.log('[MonitoringManager] No grid found on page, cannot inject items');
+      return;
+    }
+
+    let injectedCount = 0;
+
+    for (const item of newItems) {
+      // Skip if item is already on the page
+      const existingTile = grid.querySelector(`input[data-asin="${item.asin}"]`);
+      if (existingTile) {
+        continue;
+      }
+
+      const sourceTile = item.tileElement || this.createTileElementFromItem(item);
+      if (!sourceTile) {
+        continue;
+      }
+
+      // Import the tile node into the current document and prepend to grid
+      const importedTile = document.importNode(sourceTile, true);
+      grid.prepend(importedTile);
+      injectedCount++;
+    }
+
+    if (injectedCount > 0) {
+      console.log(`[MonitoringManager] Injected ${injectedCount} new item tiles into the page`);
+    }
+  }
+
+  createTileElementFromItem(item) {
+    if (!item?.asin) {
+      return null;
+    }
+
+    const tile = document.createElement('div');
+    tile.className = 'vvp-item-tile vine-new-item';
+    tile.dataset.vineSocketInjected = 'true';
+
+    const content = document.createElement('div');
+    content.className = 'vvp-item-tile-content';
+
+    const asinInput = document.createElement('input');
+    asinInput.type = 'hidden';
+    asinInput.setAttribute('data-asin', item.asin);
+    content.appendChild(asinInput);
+
+    const badge = document.createElement('div');
+    badge.className = 'vine-new-item-badge';
+    badge.textContent = 'SOCKET';
+    badge.title = 'Injected from live socket monitoring';
+    content.appendChild(badge);
+
+    if (item.imageUrl) {
+      const image = document.createElement('img');
+      image.src = item.imageUrl;
+      image.alt = item.title || item.asin;
+      image.loading = 'lazy';
+      content.appendChild(image);
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'vine-socket-meta';
+
+    const sourceChip = document.createElement('span');
+    sourceChip.className = 'vine-socket-chip vine-socket-chip-source';
+    sourceChip.textContent = 'Live';
+    meta.appendChild(sourceChip);
+
+    if (item.queue) {
+      const queueChip = document.createElement('span');
+      queueChip.className = 'vine-socket-chip vine-socket-chip-queue';
+      queueChip.textContent = this.getQueueLabelFromValue(item.queue);
+      meta.appendChild(queueChip);
+    }
+
+    if (item.reason) {
+      const reasonChip = document.createElement('span');
+      reasonChip.className = 'vine-socket-chip vine-socket-chip-reason';
+      reasonChip.textContent = item.reason;
+      meta.appendChild(reasonChip);
+    }
+
+    content.appendChild(meta);
+
+    const titleContainer = document.createElement('div');
+    titleContainer.className = 'vvp-item-product-title-container';
+
+    const titleLink = document.createElement('a');
+    titleLink.href = item.url || this.buildProductUrl(item.asin);
+
+    const truncate = document.createElement('span');
+    truncate.className = 'a-truncate';
+
+    const titleFull = document.createElement('span');
+    titleFull.className = 'a-truncate-full';
+    titleFull.textContent = item.title || item.asin;
+
+    const titleCut = document.createElement('span');
+    titleCut.className = 'a-truncate-cut';
+    titleCut.textContent = item.title || item.asin;
+
+    truncate.appendChild(titleFull);
+    truncate.appendChild(titleCut);
+    titleLink.appendChild(truncate);
+    titleContainer.appendChild(titleLink);
+    content.appendChild(titleContainer);
+    tile.appendChild(content);
+
+    return tile;
+  }
+
+  buildProductUrl(asin) {
+    const baseMatch = this.baseUrl.match(/(https:\/\/www\.amazon\.[^/]+)/);
+    const origin = baseMatch ? baseMatch[1] : window.location.origin;
+    return `${origin}/dp/${asin}`;
+  }
+
+  shouldMonitorQueue(queue) {
+    if (!queue) {
+      return true;
+    }
+
+    if (!Array.isArray(this.config.queues) || this.config.queues.length === 0) {
+      return true;
+    }
+
+    return this.config.queues.includes(queue);
+  }
+
+  startSocketConnection() {
+    if (!this.isMonitoring || !this.isSocketMode()) {
+      return;
+    }
+
+    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    const socketUrl = (this.config.socketUrl || '').trim();
+    if (!socketUrl) {
+      this.emitSocketState('error', { message: 'Socket URL is empty' });
+      return;
+    }
+
+    this.clearSocketReconnectTimer();
+    this.socketEngineConnected = false;
+    this.socketNamespaceConnected = false;
+    this.emitSocketState('connecting');
+
+    try {
+      const socket = new WebSocket(socketUrl);
+      this.socket = socket;
+
+      socket.addEventListener('open', () => {
+        if (this.socket !== socket) {
+          return;
+        }
+        console.log('[MonitoringManager] Socket transport connected');
+      });
+
+      socket.addEventListener('message', async (event) => {
+        if (this.socket !== socket) {
+          return;
+        }
+
+        await this.handleSocketMessage(event.data, socket);
+      });
+
+      socket.addEventListener('error', () => {
+        if (this.socket !== socket) {
+          return;
+        }
+
+        console.error('[MonitoringManager] Socket connection error');
+        this.emitSocketState('error', { message: 'Socket transport error' });
+      });
+
+      socket.addEventListener('close', (event) => {
+        if (this.socket === socket) {
+          this.socket = null;
+        }
+
+        this.socketEngineConnected = false;
+        this.socketNamespaceConnected = false;
+
+        if (!this.isMonitoring || !this.isSocketMode()) {
+          this.emitSocketState('disconnected', { code: event.code, message: event.reason || 'Socket closed' });
+          return;
+        }
+
+        console.warn('[MonitoringManager] Socket closed, scheduling reconnect', event.code, event.reason);
+        this.emitSocketState('reconnecting', { code: event.code, message: event.reason || 'Socket closed' });
+        this.scheduleSocketReconnect();
+      });
+    } catch (error) {
+      console.error('[MonitoringManager] Failed to create socket:', error);
+      this.emitSocketState('error', { message: error.message });
+      this.scheduleSocketReconnect();
+    }
+  }
+
+  disconnectSocket() {
+    this.clearSocketReconnectTimer();
+    this.socketEngineConnected = false;
+    this.socketNamespaceConnected = false;
+
+    if (this.socket) {
+      try {
+        this.socket.close(1000, 'Monitoring stopped');
+      } catch (error) {
+        console.warn('[MonitoringManager] Failed to close socket cleanly:', error);
+      }
+      this.socket = null;
+    }
+
+    this.emitSocketState(this.isSocketMode() ? 'disconnected' : 'hidden');
+  }
+
+  scheduleSocketReconnect() {
+    if (!this.isMonitoring || !this.isSocketMode()) {
+      return;
+    }
+
+    this.clearSocketReconnectTimer();
+    this.socketReconnectTimer = setTimeout(() => {
+      this.socketReconnectTimer = null;
+      this.startSocketConnection();
+    }, 5000);
+  }
+
+  clearSocketReconnectTimer() {
+    if (this.socketReconnectTimer) {
+      clearTimeout(this.socketReconnectTimer);
+      this.socketReconnectTimer = null;
+    }
+  }
+
+  emitSocketState(state, extra = {}) {
+    this.emit('monitoringSocketStateChanged', { state, ...extra });
+  }
+
+  async handleSocketMessage(message, socket) {
+    if (typeof message !== 'string') {
+      return;
+    }
+
+    console.log('[MonitoringManager] Socket message received:', message);
+
+    if (message.startsWith('0')) {
+      this.socketEngineConnected = true;
+      this.emitSocketState('engine_open');
+      socket.send('40');
+      return;
+    }
+
+    if (message === '2') {
+      socket.send('3');
+      return;
+    }
+
+    if (message.startsWith('40')) {
+      this.socketNamespaceConnected = true;
+      this.emitSocketState('connected');
+      return;
+    }
+
+    if (!message.startsWith('42')) {
+      return;
+    }
+
+    try {
+      const payload = JSON.parse(message.slice(2));
+      if (!Array.isArray(payload) || payload[0] !== 'newItem') {
+        return;
+      }
+
+      await this.handleSocketNewItem(payload[1]?.item);
+    } catch (error) {
+      console.error('[MonitoringManager] Failed to parse socket event payload:', error);
+    }
+  }
+
+  async handleSocketNewItem(rawItem) {
+    const item = this.normalizeSocketItem(rawItem);
+    if (!item) {
+      return;
+    }
+
+    if (!this.shouldMonitorQueue(item.queue)) {
+      console.log('[MonitoringManager] Ignoring socket item for non-monitored queue:', item.queue);
+      return;
+    }
+
+    const { newItems } = await this.processDetectedItems([item], [item.queue]);
+    if (newItems.length > 0) {
+      console.log('[MonitoringManager] Processed socket new item:', item.asin);
+    }
+  }
+
+  normalizeSocketItem(rawItem) {
+    if (!rawItem?.asin) {
+      return null;
+    }
+
+    return {
+      asin: rawItem.asin,
+      title: rawItem.title || '',
+      imageUrl: rawItem.img_url || rawItem.imageUrl || '',
+      url: rawItem.url || this.buildProductUrl(rawItem.asin),
+      queue: rawItem.queue || 'unknown',
+      reason: rawItem.reason || '',
+      source: 'socket'
+    };
   }
 
   // Get URL for a specific queue
@@ -444,11 +944,43 @@ class MonitoringManager extends BaseManager {
     }
   }
 
+  // Play a beep sound notification
+  playBeepSound() {
+    try {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      // Configure beep sound
+      oscillator.frequency.value = 800; // Frequency in Hz (higher = higher pitch)
+      oscillator.type = 'sine'; // Sine wave for a clean beep
+
+      // Volume envelope (fade in/out to avoid clicks)
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01); // Fade in
+      gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.15); // Hold
+      gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.2); // Fade out
+
+      // Play the beep
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.2); // 200ms beep
+
+      console.log('[MonitoringManager] Beep sound played');
+    } catch (error) {
+      console.error('[MonitoringManager] Error playing beep sound:', error);
+    }
+  }
+
   // Send aggregated notification for multi-queue check
   async notifyAboutNewItemsMultiQueue(items, queuesChecked) {
     if (!items || items.length === 0) return;
 
     try {
+      // Play beep sound for new items
+      this.playBeepSound();
       // Group items by queue
       const itemsByQueue = {};
       for (const item of items) {
@@ -534,6 +1066,8 @@ class MonitoringManager extends BaseManager {
     if (!items || items.length === 0) return;
 
     try {
+      // Play beep sound for new items
+      this.playBeepSound();
       // Format items for notification with truncation and cleaning
       const formatItemForNotification = (item, index) => {
         let title = item.title || 'Unknown item';
@@ -580,15 +1114,20 @@ class MonitoringManager extends BaseManager {
   }
 
   async sendNotification(notification) {
+    console.log('[MonitoringManager] sendNotification called:', notification);
+    
     if (!this.notificationProvider) {
+      console.error('[MonitoringManager] No notification provider available');
       return false;
     }
 
+    console.log('[MonitoringManager] Notification provider available, sending...');
     try {
       await this.notificationProvider.sendNotification(notification);
+      console.log('[MonitoringManager] Notification sent successfully');
       return true;
     } catch (error) {
-      console.error('MonitoringManager: Failed to send notification:', error);
+      console.error('[MonitoringManager] Failed to send notification:', error);
       return false;
     }
   }
@@ -668,5 +1207,6 @@ class MonitoringManager extends BaseManager {
   cleanup() {
     super.cleanup();
     this.stopMonitoringTimer();
+    this.disconnectSocket();
   }
 }

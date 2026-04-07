@@ -97,15 +97,42 @@ class UIManager extends BaseManager {
       <div id="monitoring-settings-panel" class="vine-monitoring-panel" style="display: none;">
         <div class="vine-monitoring-panel-content">
           <div class="vine-monitoring-section">
-            <span class="vine-monitoring-label">Monitoring:</span>
+            <span class="vine-monitoring-label">Queue:</span>
             <span id="monitoring-queue-display" class="vine-monitoring-queue-badge">Current Queue</span>
           </div>
           <div class="vine-monitoring-section">
-            <div class="vine-monitoring-interval">
-              <span class="vine-monitoring-label">Refresh:</span>
-              <input type="range" id="monitoring-interval" min="30" max="600" value="300" step="30">
-              <span id="monitoring-interval-display" class="vine-monitoring-interval-value">5min</span>
+            <span class="vine-monitoring-label">Mode:</span>
+            <div class="vine-monitoring-mode-toggle">
+              <button class="vine-monitoring-mode-btn vine-monitoring-mode-active" data-monitoring-mode="polling">Polling</button>
+              <button class="vine-monitoring-mode-btn" data-monitoring-mode="socket">Socket</button>
             </div>
+            <span id="monitoring-socket-state" class="vine-monitoring-socket-state vine-monitoring-socket-idle">Idle</span>
+          </div>
+          <div id="monitoring-refresh-section" class="vine-monitoring-section">
+            <span class="vine-monitoring-label">Refresh:</span>
+            <div class="vine-monitoring-presets">
+              <button class="vine-preset-btn" data-seconds="30">30s</button>
+              <button class="vine-preset-btn" data-seconds="60">1m</button>
+              <button class="vine-preset-btn" data-seconds="120">2m</button>
+              <button class="vine-preset-btn vine-preset-active" data-seconds="300">5m</button>
+              <button class="vine-preset-btn" data-seconds="600">10m</button>
+            </div>
+            <div class="vine-monitoring-custom">
+              <input type="number" id="monitoring-interval-input" min="10" max="1800" value="300" class="vine-interval-input">
+              <span class="vine-interval-unit">sec</span>
+            </div>
+          </div>
+          <div id="monitoring-socket-section" class="vine-monitoring-section" style="display: none;">
+            <span class="vine-monitoring-label">Socket:</span>
+            <input
+              type="text"
+              id="monitoring-socket-url-input"
+              class="vine-monitoring-socket-input"
+              placeholder="wss://api.v-helper.com/socket.io/?..."
+              value="${this.getDefaultSocketUrl()}"
+              autocomplete="off"
+              spellcheck="false"
+            >
           </div>
         </div>
       </div>
@@ -201,6 +228,10 @@ class UIManager extends BaseManager {
     document.head.appendChild(style);
   }
 
+  getDefaultSocketUrl() {
+    return window.VINE_DEFAULT_SOCKET_URL || '';
+  }
+
   setupControlListeners() {
     // Mark all seen
     document.getElementById('mark-all-seen').addEventListener('click', () => {
@@ -251,34 +282,102 @@ class UIManager extends BaseManager {
   }
 
   setupMonitoringControls() {
+    console.log('[UIManager] Setting up monitoring controls');
+    
     // Toggle monitoring button
     const monitoringToggle = document.getElementById('monitoring-toggle');
+    if (!monitoringToggle) {
+      console.error('[UIManager] monitoring-toggle button not found!');
+      return;
+    }
+    
     monitoringToggle.addEventListener('click', () => {
+      console.log('[UIManager] Monitor button clicked');
       this.toggleMonitoring();
     });
+    console.log('[UIManager] Monitor button listener attached');
 
     // Settings button to show/hide panel
     const settingsBtn = document.getElementById('monitoring-settings');
     const settingsPanel = document.getElementById('monitoring-settings-panel');
-    settingsBtn.addEventListener('click', () => {
-      const isVisible = settingsPanel.style.display !== 'none';
-      settingsPanel.style.display = isVisible ? 'none' : 'block';
+    if (settingsBtn && settingsPanel) {
+      settingsBtn.addEventListener('click', () => {
+        const isVisible = settingsPanel.style.display !== 'none';
+        settingsPanel.style.display = isVisible ? 'none' : 'block';
+        console.log('[UIManager] Settings panel toggled:', !isVisible);
+      });
+    }
+
+    // Preset buttons
+    const presetBtns = document.querySelectorAll('.vine-preset-btn');
+    const intervalInput = document.getElementById('monitoring-interval-input');
+    const modeButtons = document.querySelectorAll('[data-monitoring-mode]');
+
+    presetBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const seconds = parseInt(btn.dataset.seconds);
+        if (intervalInput) intervalInput.value = seconds;
+        this.highlightPreset(seconds);
+      });
     });
 
-    // Interval slider
-    const intervalSlider = document.getElementById('monitoring-interval');
-    const intervalDisplay = document.getElementById('monitoring-interval-display');
-    intervalSlider.addEventListener('input', (e) => {
-      const seconds = parseInt(e.target.value);
-      intervalDisplay.textContent = this.formatInterval(seconds);
+    // Custom number input clears preset highlight when value doesn't match
+    if (intervalInput) {
+      intervalInput.addEventListener('input', () => {
+        const val = parseInt(intervalInput.value);
+        this.highlightPreset(val);
+      });
+    }
+
+    modeButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.setMonitoringMode(btn.dataset.monitoringMode);
+      });
     });
 
     // Update queue display based on current page
     this.updateQueueDisplay();
 
     // Listen for monitoring state changes from MonitoringManager
+    console.log('[UIManager] Setting up monitoringStateChanged listener');
     this.on('monitoringStateChanged', (data) => {
+      console.log('[UIManager] Received monitoringStateChanged event:', data);
       this.updateMonitoringUI(data.isMonitoring, data.config);
+    });
+
+    this.on('monitoringSocketStateChanged', (data) => {
+      this.updateSocketState(data?.state, data);
+    });
+
+    // Sync UI with persisted monitoring state (handles case where
+    // MonitoringManager emitted the event before UIManager was ready)
+    const monitoringEnabled = sessionStorage.getItem('vineMonitoringEnabled') === 'true';
+    if (monitoringEnabled) {
+      try {
+        const configStr = sessionStorage.getItem('vineMonitoringConfig');
+        const config = configStr ? JSON.parse(configStr) : {};
+        this.updateMonitoringUI(true, config);
+      } catch (e) {
+        this.updateMonitoringUI(true, {});
+      }
+    } else {
+      try {
+        const configStr = sessionStorage.getItem('vineMonitoringConfig');
+        const config = configStr ? JSON.parse(configStr) : {};
+        this.updateMonitoringConfigUI(config);
+      } catch (e) {
+        this.updateMonitoringConfigUI({});
+      }
+    }
+  }
+
+  highlightPreset(seconds) {
+    const presetBtns = document.querySelectorAll('.vine-preset-btn');
+    presetBtns.forEach(btn => {
+      const btnSeconds = parseInt(btn.dataset.seconds);
+      btn.classList.toggle('vine-preset-active', btnSeconds === seconds);
     });
   }
 
@@ -329,45 +428,90 @@ class UIManager extends BaseManager {
   }
 
   toggleMonitoring() {
+    console.log('[UIManager] toggleMonitoring called');
     const monitoringToggle = document.getElementById('monitoring-toggle');
     const isCurrentlyMonitoring = monitoringToggle.classList.contains('vine-btn-monitoring-on');
+    console.log('[UIManager] Current monitoring state:', isCurrentlyMonitoring);
 
     if (isCurrentlyMonitoring) {
       // Stop monitoring
+      console.log('[UIManager] Emitting stopMonitoring event');
       this.emit('stopMonitoring');
     } else {
       // Start monitoring with current config
       const config = this.getMonitoringConfig();
-      if (!config) return; // Validation failed
+      console.log('[UIManager] Monitoring config:', config);
+      if (!config) {
+        console.error('[UIManager] Failed to get monitoring config');
+        return; // Validation failed
+      }
+      console.log('[UIManager] Emitting startMonitoring event with config:', config);
       this.emit('startMonitoring', config);
     }
   }
 
   getMonitoringConfig() {
+    console.log('[UIManager] getMonitoringConfig called');
+    
     // Get current queue from URL
     const currentQueue = this.getCurrentQueue();
+    console.log('[UIManager] Current queue:', currentQueue);
 
     // Get refresh interval
-    const refreshIntervalSeconds = parseInt(document.getElementById('monitoring-interval').value);
+    const intervalElement = document.getElementById('monitoring-interval-input');
+    if (!intervalElement) {
+      console.error('[UIManager] monitoring-interval-input element not found!');
+      alert('Error: Cannot find monitoring interval setting. Please refresh the page.');
+      return null;
+    }
 
-    return {
+    const refreshIntervalSeconds = parseInt(intervalElement.value) || 300;
+    console.log('[UIManager] Refresh interval:', refreshIntervalSeconds);
+    const selectedMode = document.querySelector('.vine-monitoring-mode-btn.vine-monitoring-mode-active')?.dataset.monitoringMode || 'polling';
+    const socketUrl = document.getElementById('monitoring-socket-url-input')?.value?.trim() || '';
+
+    const config = {
       queues: [currentQueue],
       refreshIntervalSeconds,
-      searchQuery: ''
+      searchQuery: '',
+      transportMode: selectedMode,
+      socketUrl
     };
+
+    if (selectedMode === 'socket' && !socketUrl) {
+      alert('Please enter a socket URL before starting socket monitoring.');
+      return null;
+    }
+    
+    console.log('[UIManager] Final config:', config);
+    return config;
   }
 
   updateMonitoringUI(isMonitoring, config) {
+    console.log('[UIManager] updateMonitoringUI called:', { isMonitoring, config });
+    
     const monitoringToggle = document.getElementById('monitoring-toggle');
+    if (!monitoringToggle) {
+      console.error('[UIManager] monitoring-toggle button not found!');
+      return;
+    }
+    
     const icon = monitoringToggle.querySelector('.vine-btn-icon');
     const text = monitoringToggle.querySelector('.vine-btn-text');
 
+    if (!icon || !text) {
+      console.error('[UIManager] Button icon or text not found!');
+      return;
+    }
+
     if (isMonitoring) {
+      console.log('[UIManager] Setting UI to monitoring state');
       monitoringToggle.classList.remove('vine-btn-monitoring-off');
       monitoringToggle.classList.add('vine-btn-monitoring-on');
       icon.textContent = '⏸️';
       text.textContent = 'Stop';
     } else {
+      console.log('[UIManager] Setting UI to stopped state');
       monitoringToggle.classList.remove('vine-btn-monitoring-on');
       monitoringToggle.classList.add('vine-btn-monitoring-off');
       icon.textContent = '▶️';
@@ -376,6 +520,7 @@ class UIManager extends BaseManager {
 
     // Update config UI if provided
     if (config) {
+      console.log('[UIManager] Updating config UI');
       this.updateMonitoringConfigUI(config);
     }
   }
@@ -384,12 +529,75 @@ class UIManager extends BaseManager {
     // Update queue display
     this.updateQueueDisplay();
 
-    // Update interval slider
-    const intervalSlider = document.getElementById('monitoring-interval');
-    const intervalDisplay = document.getElementById('monitoring-interval-display');
-    if (intervalSlider && config.refreshIntervalSeconds) {
-      intervalSlider.value = config.refreshIntervalSeconds;
-      intervalDisplay.textContent = this.formatInterval(config.refreshIntervalSeconds);
+    const transportMode = config.transportMode === 'socket' ? 'socket' : 'polling';
+    this.setMonitoringMode(transportMode, false);
+
+    // Update interval input and highlight matching preset
+    const intervalInput = document.getElementById('monitoring-interval-input');
+    if (intervalInput && config.refreshIntervalSeconds) {
+      intervalInput.value = config.refreshIntervalSeconds;
+      this.highlightPreset(config.refreshIntervalSeconds);
+    }
+
+    const socketInput = document.getElementById('monitoring-socket-url-input');
+    if (socketInput) {
+      socketInput.value = config.socketUrl || this.getDefaultSocketUrl();
+    }
+  }
+
+  setMonitoringMode(mode, updateState = true) {
+    const normalizedMode = mode === 'socket' ? 'socket' : 'polling';
+    const modeButtons = document.querySelectorAll('[data-monitoring-mode]');
+
+    modeButtons.forEach(btn => {
+      btn.classList.toggle('vine-monitoring-mode-active', btn.dataset.monitoringMode === normalizedMode);
+    });
+
+    const refreshSection = document.getElementById('monitoring-refresh-section');
+    const socketSection = document.getElementById('monitoring-socket-section');
+
+    if (refreshSection) {
+      refreshSection.style.display = normalizedMode === 'socket' ? 'none' : 'flex';
+    }
+
+    if (socketSection) {
+      socketSection.style.display = normalizedMode === 'socket' ? 'flex' : 'none';
+    }
+
+    if (updateState) {
+      this.updateSocketState(normalizedMode === 'socket' ? 'idle' : 'hidden');
+    }
+  }
+
+  updateSocketState(state, data = {}) {
+    const socketState = document.getElementById('monitoring-socket-state');
+    if (!socketState) return;
+
+    const normalizedState = state || 'idle';
+    const labelMap = {
+      hidden: 'Polling',
+      idle: 'Idle',
+      connecting: 'Connecting',
+      engine_open: 'Handshake',
+      connected: 'Connected',
+      reconnecting: 'Reconnecting',
+      disconnected: 'Disconnected',
+      error: 'Error'
+    };
+
+    socketState.textContent = labelMap[normalizedState] || 'Idle';
+    socketState.className = 'vine-monitoring-socket-state';
+
+    if (normalizedState !== 'hidden') {
+      socketState.classList.add(`vine-monitoring-socket-${normalizedState.replace(/_/g, '-')}`);
+    }
+
+    if (data.message) {
+      socketState.title = data.message;
+    } else if (data.code) {
+      socketState.title = `Socket state: ${normalizedState} (${data.code})`;
+    } else {
+      socketState.title = `Socket state: ${normalizedState}`;
     }
   }
 

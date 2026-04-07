@@ -9,13 +9,19 @@ class BaseManager {
   // Event system for manager communication
   emit(eventName, data) {
     if (window.vineEventBus) {
+      console.log(`[BaseManager] Emitting event: ${eventName}`, data);
       window.vineEventBus.emit(eventName, data);
+    } else {
+      console.error(`[BaseManager] Cannot emit ${eventName}: vineEventBus not available`);
     }
   }
 
   on(eventName, callback) {
     if (window.vineEventBus) {
+      console.log(`[BaseManager] Registering listener for event: ${eventName}`);
       window.vineEventBus.on(eventName, callback);
+    } else {
+      console.error(`[BaseManager] Cannot register listener for ${eventName}: vineEventBus not available`);
     }
   }
 
@@ -101,14 +107,20 @@ class EventBus {
   }
 
   emit(eventName, data) {
+    const listenerCount = this.events.has(eventName) ? this.events.get(eventName).length : 0;
+    console.log(`[EventBus] Emitting ${eventName} to ${listenerCount} listener(s)`, data);
+    
     if (this.events.has(eventName)) {
-      this.events.get(eventName).forEach(callback => {
+      this.events.get(eventName).forEach((callback, index) => {
         try {
+          console.log(`[EventBus] Calling listener ${index + 1} for ${eventName}`);
           callback(data);
         } catch (error) {
-          console.error(`Error in event handler for ${eventName}:`, error);
+          console.error(`[EventBus] Error in event handler ${index + 1} for ${eventName}:`, error);
         }
       });
+    } else {
+      console.warn(`[EventBus] No listeners registered for event: ${eventName}`);
     }
   }
 }
