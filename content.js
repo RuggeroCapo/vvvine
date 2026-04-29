@@ -305,6 +305,7 @@ class AmazonVineEnhancer {
     this.managers.filter = new FilterManager();
     this.managers.seenItems = new SeenItemsManager();
     this.managers.bookmarks = new BookmarkManager();
+    this.managers.rocket = new RocketManager();
     this.managers.newItems = new NewItemsManager();
     this.managers.pageDetection = new PageDetectionManager();
     this.managers.categoryTracker = new CategoryTrackerManager();
@@ -430,6 +431,7 @@ class AmazonVineEnhancer {
       'filter',              // Independent
       'seenItems',           // Depends on storage
       'bookmarks',           // Depends on storage
+      'rocket',              // Handles instant-order tile actions
       'newItems',            // Depends on storage
       'pageDetection',       // Independent
       'categoryTracker',     // Depends on storage, pageDetection

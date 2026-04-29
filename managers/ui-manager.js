@@ -64,6 +64,9 @@ class UIManager extends BaseManager {
             <span class="vine-btn-icon">▶️</span>
             <span class="vine-btn-text">Monitor</span>
           </button>
+          <button id="monitoring-refresh" title="Refresh Now">
+            <span class="vine-btn-icon">🔄</span>
+          </button>
           <button id="monitoring-settings" title="Monitoring Settings">
             <span class="vine-btn-icon">⚙️</span>
           </button>
@@ -296,6 +299,20 @@ class UIManager extends BaseManager {
       this.toggleMonitoring();
     });
     console.log('[UIManager] Monitor button listener attached');
+
+    // Refresh button
+    const refreshBtn = document.getElementById('monitoring-refresh');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        refreshBtn.disabled = true;
+        refreshBtn.querySelector('.vine-btn-icon').classList.add('vine-spinning');
+        this.emit('manualRefresh');
+      });
+      this.on('manualRefreshComplete', () => {
+        refreshBtn.disabled = false;
+        refreshBtn.querySelector('.vine-btn-icon').classList.remove('vine-spinning');
+      });
+    }
 
     // Settings button to show/hide panel
     const settingsBtn = document.getElementById('monitoring-settings');

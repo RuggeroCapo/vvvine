@@ -153,6 +153,10 @@ class MonitoringManager extends BaseManager {
       console.log('[MonitoringManager] Received stopMonitoring event');
       this.stopMonitoring();
     });
+    this.on('manualRefresh', () => {
+      console.log('[MonitoringManager] Received manualRefresh event');
+      this.performManualRefresh();
+    });
   }
 
   async loadMonitoringState() {
@@ -314,9 +318,18 @@ class MonitoringManager extends BaseManager {
     return this.isSocketMode() ? 'socket stream' : 'polling';
   }
 
+  async performManualRefresh() {
+    console.log('[MonitoringManager] Manual refresh triggered');
+    try {
+      await this.checkAllQueues(true);
+    } finally {
+      this.emit('manualRefreshComplete');
+    }
+  }
+
   // Check all configured queues using fetch (no navigation)
-  async checkAllQueues() {
-    if (!this.isMonitoring) {
+  async checkAllQueues(force = false) {
+    if (!this.isMonitoring && !force) {
       return;
     }
 
@@ -561,12 +574,101 @@ class MonitoringManager extends BaseManager {
 
       // Import the tile node into the current document and prepend to grid
       const importedTile = document.importNode(sourceTile, true);
+      this.prepareInjectedTile(importedTile, item);
       grid.prepend(importedTile);
+      this.processInjectedTile(importedTile);
       injectedCount++;
     }
 
     if (injectedCount > 0) {
       console.log(`[MonitoringManager] Injected ${injectedCount} new item tiles into the page`);
+    }
+  }
+
+  prepareInjectedTile(tile, item) {
+    if (!tile) {
+      return;
+    }
+
+    tile.classList.add('vine-new-item');
+    tile.dataset.vineSocketInjected = item?.source === 'socket' ? 'true' : 'false';
+
+    if (item?.source === 'socket') {
+      this.decorateSocketTile(tile, item);
+    }
+  }
+
+  decorateSocketTile(tile, item) {
+    const content = tile.querySelector('.vvp-item-tile-content');
+    if (!content) {
+      return;
+    }
+
+    const existingBadge = content.querySelector('.vine-new-item-badge');
+    if (existingBadge) {
+      existingBadge.remove();
+    }
+
+    const badge = document.createElement('div');
+    badge.className = 'vine-new-item-badge';
+    badge.textContent = 'SOCKET';
+    badge.title = 'Injected from live socket monitoring';
+    content.appendChild(badge);
+
+    const existingMeta = content.querySelector('.vine-socket-meta');
+    if (existingMeta) {
+      existingMeta.remove();
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'vine-socket-meta';
+
+    const sourceChip = document.createElement('span');
+    sourceChip.className = 'vine-socket-chip vine-socket-chip-source';
+    sourceChip.textContent = 'Live';
+    meta.appendChild(sourceChip);
+
+    if (item?.queue) {
+      const queueChip = document.createElement('span');
+      queueChip.className = 'vine-socket-chip vine-socket-chip-queue';
+      queueChip.textContent = this.getQueueLabelFromValue(item.queue);
+      meta.appendChild(queueChip);
+    }
+
+    if (item?.reason) {
+      const reasonChip = document.createElement('span');
+      reasonChip.className = 'vine-socket-chip vine-socket-chip-reason';
+      reasonChip.textContent = item.reason;
+      meta.appendChild(reasonChip);
+    }
+
+    const titleContainer = content.querySelector('.vvp-item-product-title-container');
+    if (titleContainer) {
+      titleContainer.before(meta);
+    } else {
+      content.appendChild(meta);
+    }
+  }
+
+  processInjectedTile(tile) {
+    const enhancer = window.vineEnhancer;
+    if (!enhancer?.getManager) {
+      return;
+    }
+
+    const seenItemsManager = enhancer.getManager('seenItems');
+    if (seenItemsManager?.processItem && !tile.hasAttribute('data-vine-processed')) {
+      seenItemsManager.processItem(tile);
+    }
+
+    const bookmarkManager = enhancer.getManager('bookmarks');
+    if (bookmarkManager?.processItem && !tile.hasAttribute('data-vine-bookmark-processed')) {
+      bookmarkManager.processItem(tile);
+    }
+
+    const rocketManager = enhancer.getManager('rocket');
+    if (rocketManager?.processItem && !tile.hasAttribute('data-vine-rocket-processed')) {
+      rocketManager.processItem(tile);
     }
   }
 
@@ -578,9 +680,19 @@ class MonitoringManager extends BaseManager {
     const tile = document.createElement('div');
     tile.className = 'vvp-item-tile vine-new-item';
     tile.dataset.vineSocketInjected = 'true';
+    if (item.recommendationId) {
+      tile.dataset.recommendationId = item.recommendationId;
+    }
+    if (item.imageUrl) {
+      tile.dataset.imgUrl = item.imageUrl;
+    }
 
     const content = document.createElement('div');
     content.className = 'vvp-item-tile-content';
+
+    const itemBadges = document.createElement('div');
+    itemBadges.className = 'vvp-item-badges';
+    content.appendChild(itemBadges);
 
     const asinInput = document.createElement('input');
     asinInput.type = 'hidden';
@@ -629,6 +741,9 @@ class MonitoringManager extends BaseManager {
     titleContainer.className = 'vvp-item-product-title-container';
 
     const titleLink = document.createElement('a');
+    titleLink.className = 'a-link-normal';
+    titleLink.target = '_blank';
+    titleLink.rel = 'noopener';
     titleLink.href = item.url || this.buildProductUrl(item.asin);
 
     const truncate = document.createElement('span');
@@ -647,6 +762,12 @@ class MonitoringManager extends BaseManager {
     titleLink.appendChild(truncate);
     titleContainer.appendChild(titleLink);
     content.appendChild(titleContainer);
+
+    const detailsButton = this.createDetailsButton(item);
+    if (detailsButton) {
+      content.appendChild(detailsButton);
+    }
+
     tile.appendChild(content);
 
     return tile;
@@ -656,6 +777,90 @@ class MonitoringManager extends BaseManager {
     const baseMatch = this.baseUrl.match(/(https:\/\/www\.amazon\.[^/]+)/);
     const origin = baseMatch ? baseMatch[1] : window.location.origin;
     return `${origin}/dp/${asin}`;
+  }
+
+  createDetailsButton(item) {
+    if (!item?.asin || !item.recommendationId) {
+      return null;
+    }
+
+    const outer = document.createElement('span');
+    outer.className = 'a-button a-button-primary vvp-details-btn';
+
+    const inner = document.createElement('span');
+    inner.className = 'a-button-inner';
+
+    const input = document.createElement('input');
+    input.className = 'a-button-input';
+    input.type = 'submit';
+    input.dataset.asin = item.asin;
+    input.dataset.isParentAsin = item.isParentAsin ? 'true' : 'false';
+    input.dataset.isPreRelease = item.isPreRelease ? 'true' : 'false';
+    input.dataset.recommendationId = item.recommendationId;
+    input.dataset.recommendationType = item.recommendationType || 'VINE_FOR_ALL';
+
+    const text = document.createElement('span');
+    text.className = 'a-button-text';
+    text.setAttribute('aria-hidden', 'true');
+    text.textContent = 'Visualizza dettagli';
+
+    inner.appendChild(input);
+    inner.appendChild(text);
+    outer.appendChild(inner);
+
+    return outer;
+  }
+
+  getVvpContext() {
+    try {
+      const stateScript = document.querySelector('script[data-a-state*="vvp-context"]');
+      if (!stateScript?.textContent) {
+        return null;
+      }
+
+      return JSON.parse(stateScript.textContent.trim());
+    } catch (error) {
+      console.warn('[MonitoringManager] Failed to parse vvp-context:', error);
+      return null;
+    }
+  }
+
+  inferRecommendationType(item) {
+    if (item?.recommendationType) {
+      return item.recommendationType;
+    }
+
+    switch (item?.queue) {
+      case 'potluck':
+        return 'VENDOR_TARGETED';
+      case 'search':
+        return 'SEARCH';
+      case 'encore':
+      case 'last_chance':
+      default:
+        return 'VINE_FOR_ALL';
+    }
+  }
+
+  buildRecommendationId(item) {
+    if (item?.recommendationId || !item?.asin || !item?.enrollmentGuid) {
+      return item?.recommendationId || '';
+    }
+
+    const context = this.getVvpContext();
+    const marketplaceId = context?.marketplaceId || '';
+    if (!marketplaceId) {
+      return '';
+    }
+
+    const parts = [marketplaceId, item.asin];
+
+    if (this.inferRecommendationType(item) === 'VENDOR_TARGETED' && context?.customerId) {
+      parts.push(context.customerId);
+    }
+
+    parts.push(`vine.enrollment.${item.enrollmentGuid}`);
+    return parts.join('#');
   }
 
   shouldMonitorQueue(queue) {
@@ -845,15 +1050,25 @@ class MonitoringManager extends BaseManager {
       return null;
     }
 
-    return {
+    const normalizedItem = {
       asin: rawItem.asin,
       title: rawItem.title || '',
       imageUrl: rawItem.img_url || rawItem.imageUrl || '',
       url: rawItem.url || this.buildProductUrl(rawItem.asin),
       queue: rawItem.queue || 'unknown',
       reason: rawItem.reason || '',
+      enrollmentGuid: rawItem.enrollment_guid || rawItem.enrollmentGuid || '',
+      isParentAsin: `${rawItem.is_parent_asin ?? rawItem.isParentAsin ?? 'false'}` === 'true',
+      isPreRelease: `${rawItem.is_pre_release ?? rawItem.isPreRelease ?? 'false'}` === 'true',
+      recommendationType: rawItem.recommendation_type || rawItem.recommendationType || '',
+      recommendationId: rawItem.recommendation_id || rawItem.recommendationId || '',
       source: 'socket'
     };
+
+    normalizedItem.recommendationType = this.inferRecommendationType(normalizedItem);
+    normalizedItem.recommendationId = this.buildRecommendationId(normalizedItem);
+
+    return normalizedItem;
   }
 
   // Get URL for a specific queue
