@@ -646,6 +646,73 @@ html {
   text-align: right;
 }
 
+/* Autopick score badge */
+.vine-autopick-score {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 25;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #fff;
+  background: rgba(71, 85, 105, 0.92);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+  pointer-events: none;
+}
+
+.vine-autopick-confidence {
+  letter-spacing: 0.02em;
+}
+
+.vine-autopick-source {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  opacity: 0.9;
+  padding-left: 4px;
+  border-left: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.vine-autopick-high {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+.vine-autopick-mid {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}
+
+.vine-autopick-low {
+  background: linear-gradient(135deg, #d97706, #b45309);
+}
+
+.vine-autopick-min {
+  background: rgba(100, 116, 139, 0.92);
+}
+
+.vine-table-autopick {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: #64748b;
+}
+
+.vine-table-autopick-source {
+  font-size: 9px;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
 /* New item state styles - Modern & Clean */
 .vine-new-item {
   border-color: #3b82f6 !important;
@@ -1339,7 +1406,7 @@ footer[role="contentinfo"],
   box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3) !important;
 }
 
-.vine-monitoring-socket-state {
+.vine-monitoring-live-state {
   font-size: 12px;
   font-weight: 700;
   padding: 5px 10px;
@@ -1349,28 +1416,27 @@ footer[role="contentinfo"],
   color: #475569;
 }
 
-.vine-monitoring-socket-idle,
-.vine-monitoring-socket-disconnected {
+.vine-monitoring-live-idle,
+.vine-monitoring-live-disconnected {
   background: rgba(148, 163, 184, 0.12);
   color: #475569;
   border-color: rgba(148, 163, 184, 0.2);
 }
 
-.vine-monitoring-socket-connecting,
-.vine-monitoring-socket-engine-open,
-.vine-monitoring-socket-reconnecting {
+.vine-monitoring-live-connecting,
+.vine-monitoring-live-reconnecting {
   background: rgba(245, 158, 11, 0.12);
   color: #b45309;
   border-color: rgba(245, 158, 11, 0.2);
 }
 
-.vine-monitoring-socket-connected {
+.vine-monitoring-live-connected {
   background: rgba(16, 185, 129, 0.12);
   color: #047857;
   border-color: rgba(16, 185, 129, 0.2);
 }
 
-.vine-monitoring-socket-error {
+.vine-monitoring-live-error {
   background: rgba(239, 68, 68, 0.12);
   color: #b91c1c;
   border-color: rgba(239, 68, 68, 0.2);
@@ -1450,7 +1516,7 @@ footer[role="contentinfo"],
   color: #6b7280;
 }
 
-.vine-monitoring-socket-input {
+.vine-monitoring-live-input {
   min-width: 420px;
   max-width: 700px;
   width: min(62vw, 700px);
@@ -1464,19 +1530,19 @@ footer[role="contentinfo"],
   font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
 }
 
-.vine-monitoring-socket-input:focus {
+.vine-monitoring-live-input:focus {
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
 }
 
-.vine-socket-meta {
+.vine-live-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.vine-socket-chip {
+.vine-live-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1488,17 +1554,17 @@ footer[role="contentinfo"],
   text-transform: uppercase;
 }
 
-.vine-socket-chip-source {
+.vine-live-chip-source {
   background: rgba(59, 130, 246, 0.1);
   color: #1d4ed8;
 }
 
-.vine-socket-chip-queue {
+.vine-live-chip-queue {
   background: rgba(16, 185, 129, 0.12);
   color: #047857;
 }
 
-.vine-socket-chip-reason {
+.vine-live-chip-reason {
   background: rgba(245, 158, 11, 0.12);
   color: #b45309;
 }
@@ -1515,7 +1581,7 @@ footer[role="contentinfo"],
     flex-wrap: wrap;
   }
 
-  .vine-monitoring-socket-input {
+  .vine-monitoring-live-input {
     min-width: 280px;
     width: 100%;
   }
@@ -1542,7 +1608,7 @@ footer[role="contentinfo"],
     flex: 1;
   }
 
-  .vine-monitoring-socket-input {
+  .vine-monitoring-live-input {
     min-width: 0;
   }
 }

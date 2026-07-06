@@ -43,6 +43,11 @@ class AmazonVineEnhancer {
           .then(() => sendResponse({ success: true }))
           .catch(error => sendResponse({ success: false, error: error.message }));
         return true; // Keep channel open for async response
+      } else if (request.action === 'updateAutopickConfig') {
+        this.handleUpdateAutopickConfig(request.config)
+          .then(() => sendResponse({ success: true }))
+          .catch(error => sendResponse({ success: false, error: error.message }));
+        return true;
       }
 
       return false; // Close channel for sync responses
@@ -115,6 +120,22 @@ class AmazonVineEnhancer {
     const notificationProvider = this.managers.notificationProvider;
     if (notificationProvider) {
       await notificationProvider.saveTelegramConfig(config);
+    }
+  }
+
+  async handleUpdateAutopickConfig(config) {
+    const autopickManager = this.managers.autopick;
+    if (autopickManager) {
+      await autopickManager.updateConfiguration(config);
+      this.emitAutopickConfigUpdated(config);
+    } else {
+      await chrome.storage.local.set({ vineAutopickConfig: config });
+    }
+  }
+
+  emitAutopickConfigUpdated(config) {
+    if (window.vineEventBus) {
+      window.vineEventBus.emit('autopick:configUpdated', { config });
     }
   }
 
@@ -311,6 +332,7 @@ class AmazonVineEnhancer {
     this.managers.categoryTracker = new CategoryTrackerManager();
     this.managers.notificationProvider = new NotificationProviderManager();
     this.managers.monitoring = new MonitoringManager();
+    this.managers.autopick = new AutopickManager();
     this.managers.ui = new UIManager();
     this.managers.keyboard = new KeyboardManager();
     this.managers.page = new PageManager();
@@ -422,6 +444,8 @@ class AmazonVineEnhancer {
     window.vineNewItemsManager = this.managers.newItems;
     window.vineMonitoringManager = this.managers.monitoring;
     window.vineNotificationProvider = this.managers.notificationProvider;
+    window.vineAutopickManager = this.managers.autopick;
+    window.vineRocketManager = this.managers.rocket;
   }
 
   async startManagers() {
@@ -437,6 +461,7 @@ class AmazonVineEnhancer {
       'categoryTracker',     // Depends on storage, pageDetection
       'notificationProvider',// Independent
       'monitoring',          // Depends on storage, newItems, pageDetection, notificationProvider
+      'autopick',            // Depends on monitoring (discovery events); scores items only
       'ui',                  // Needs to be available for status updates
       'keyboard',            // Coordinates with other managers
       'page'                 // Independent
@@ -507,6 +532,7 @@ class AmazonVineEnhancer {
     delete window.vineStorageManager;
     delete window.vineBookmarkManager;
     delete window.vineNewItemsManager;
+    delete window.vineAutopickManager;
     
     this.managers = {};
     this.isInitialized = false;

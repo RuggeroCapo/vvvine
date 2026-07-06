@@ -74,9 +74,11 @@ function setupEventListeners() {
   document.getElementById('clear-notified').addEventListener('click', clearNotifiedItems);
   document.getElementById('save-telegram-config').addEventListener('click', saveTelegramConfig);
   document.getElementById('test-telegram').addEventListener('click', testTelegramConnection);
+  document.getElementById('save-autopick-config').addEventListener('click', saveAutopickConfig);
 
   // Load Telegram config on startup
   loadTelegramConfig();
+  loadAutopickConfig();
 }
 
 async function exportData() {
@@ -504,6 +506,124 @@ function showTelegramStatus(message, type) {
   }
   
   // Auto-hide after 5 seconds for success/info
+  if (type !== 'error') {
+    setTimeout(() => {
+      statusElement.style.display = 'none';
+    }, 5000);
+  }
+}
+
+function getAutopickDefaults() {
+  return {
+    enabled: false,
+    dryRun: true,
+    thresholdPercent: 75,
+    llm: {
+      enabled: false,
+      provider: 'gemini',
+      model: 'gemini-2.0-flash',
+      apiKey: '',
+      preferencesPrompt: '',
+      timeoutMs: 1200
+    }
+  };
+}
+
+async function loadAutopickConfig() {
+  try {
+    const result = await chrome.storage.local.get(['vineAutopickConfig']);
+    const config = { ...getAutopickDefaults(), ...(result.vineAutopickConfig || {}) };
+    const llm = { ...getAutopickDefaults().llm, ...(config.llm || {}) };
+
+    document.getElementById('autopick-enabled').checked = Boolean(config.enabled);
+    document.getElementById('autopick-threshold').value = config.thresholdPercent ?? 75;
+    document.getElementById('autopick-llm-enabled').checked = Boolean(llm.enabled);
+    document.getElementById('autopick-gemini-model').value = llm.model || 'gemini-2.0-flash';
+    document.getElementById('autopick-gemini-api-key').value = llm.apiKey || '';
+    document.getElementById('autopick-preferences').value = llm.preferencesPrompt || '';
+    document.getElementById('autopick-llm-timeout').value = llm.timeoutMs || 1200;
+  } catch (error) {
+    console.error('Error loading autopick config:', error);
+  }
+}
+
+function collectAutopickConfigFromForm() {
+  const existingPromise = chrome.storage.local.get(['vineAutopickConfig']);
+
+  return existingPromise.then((result) => {
+    const existing = result.vineAutopickConfig || {};
+    const defaults = getAutopickDefaults();
+
+    return {
+      ...defaults,
+      ...existing,
+      enabled: document.getElementById('autopick-enabled').checked,
+      thresholdPercent: parseInt(document.getElementById('autopick-threshold').value, 10) || 75,
+      llm: {
+        ...defaults.llm,
+        ...(existing.llm || {}),
+        enabled: document.getElementById('autopick-llm-enabled').checked,
+        provider: 'gemini',
+        model: document.getElementById('autopick-gemini-model').value.trim() || 'gemini-2.0-flash',
+        apiKey: document.getElementById('autopick-gemini-api-key').value.trim(),
+        preferencesPrompt: document.getElementById('autopick-preferences').value.trim(),
+        timeoutMs: parseInt(document.getElementById('autopick-llm-timeout').value, 10) || 1200
+      }
+    };
+  });
+}
+
+async function saveAutopickConfig() {
+  try {
+    const config = await collectAutopickConfigFromForm();
+    await chrome.storage.local.set({ vineAutopickConfig: config });
+
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id && tab.url?.includes('/vine/')) {
+      try {
+        await chrome.tabs.sendMessage(tab.id, {
+          action: 'updateAutopickConfig',
+          config
+        });
+      } catch (error) {
+        console.warn('Could not push autopick config to active Vine tab:', error);
+      }
+    }
+
+    showAutopickStatus('Configuration saved!', 'success');
+
+    const button = document.getElementById('save-autopick-config');
+    const originalHTML = button.innerHTML;
+    button.innerHTML = '<span class="btn-icon">✅</span> Saved';
+    setTimeout(() => {
+      button.innerHTML = originalHTML;
+    }, 2000);
+  } catch (error) {
+    console.error('Error saving autopick config:', error);
+    showAutopickStatus('Error saving configuration', 'error');
+  }
+}
+
+function showAutopickStatus(message, type) {
+  const statusElement = document.getElementById('autopick-status');
+  statusElement.textContent = message;
+  statusElement.style.display = 'block';
+
+  switch (type) {
+    case 'success':
+      statusElement.style.color = '#10b981';
+      statusElement.style.background = 'rgba(16, 185, 129, 0.1)';
+      break;
+    case 'error':
+      statusElement.style.color = '#ef4444';
+      statusElement.style.background = 'rgba(239, 68, 68, 0.1)';
+      break;
+    default:
+      statusElement.style.color = '#3b82f6';
+      statusElement.style.background = 'rgba(59, 130, 246, 0.1)';
+      break;
+  }
+
   if (type !== 'error') {
     setTimeout(() => {
       statusElement.style.display = 'none';

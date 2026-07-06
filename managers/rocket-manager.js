@@ -19,6 +19,7 @@ class RocketManager extends BaseManager {
     this.isOrdering = false;
     this.activeButton = null;
     this.activeOrder = null;
+    this.activeOrderSource = null;
     this.addressListenersAttached = false;
     this.handleWindowMessage = this.handleWindowMessage.bind(this);
   }
@@ -48,8 +49,6 @@ class RocketManager extends BaseManager {
 
       clearTimeout(this.processItemsTimeout);
       this.processItemsTimeout = setTimeout(() => {
-        this.csrfToken = this.getCsrfToken();
-        this.syncSelectedAddress();
         this.attachAddressListeners();
         for (const tile of tiles) {
           this.processItem(tile);
@@ -59,7 +58,8 @@ class RocketManager extends BaseManager {
 
     this.gridObserver.observe(grid, {
       childList: true,
-      subtree: true
+      // Keep this cheap on hot grid updates; Amazon currently appends tiles as direct children.
+      subtree: false
     });
   }
 
@@ -99,15 +99,15 @@ class RocketManager extends BaseManager {
     const items = document.querySelectorAll('.vvp-item-tile');
 
     items.forEach((item) => {
-      if (item.hasAttribute('data-vine-rocket-processed')) {
-        return;
-      }
-
       this.processItem(item);
     });
   }
 
   processItem(item) {
+    if (item.hasAttribute('data-vine-rocket-processed')) {
+      return;
+    }
+
     const itemData = this.extractItemData(item);
     if (!itemData) {
       return;
@@ -134,8 +134,7 @@ class RocketManager extends BaseManager {
       asin,
       recommendationId,
       recommendationType: input.dataset.recommendationType || 'VINE_FOR_ALL',
-      isParent: input.dataset.isParentAsin === 'true',
-      title: this.extractItemTitle(item)
+      isParent: input.dataset.isParentAsin === 'true'
     };
   }
 
@@ -167,10 +166,19 @@ class RocketManager extends BaseManager {
     }
   }
 
+  // Thin wrapper: binds the on-tile button UI to the shared order executor.
   async handleRocketClick(button, itemData) {
+    return this.placeOrder(itemData, { button, source: 'manual' });
+  }
+
+  // Programmatic order entry. ctx.button is optional (null for autopick-driven orders).
+  async placeOrder(itemData, ctx = {}) {
+    const button = ctx.button || null;
+    const source = ctx.source || 'manual';
+
     if (this.isOrdering) {
       this.showToast('Order already in progress', 'warning');
-      return;
+      return false;
     }
 
     this.csrfToken = this.getCsrfToken();
@@ -178,35 +186,51 @@ class RocketManager extends BaseManager {
 
     if (!this.csrfToken) {
       this.showToast('Missing CSRF token on page', 'error');
-      return;
+      return false;
     }
 
     if (!this.selectedAddressId || !this.selectedLegacyAddressId) {
       this.showToast('No Vine address detected', 'error');
-      return;
+      return false;
     }
 
     this.isOrdering = true;
     this.activeButton = button;
     this.activeOrder = itemData;
+    this.activeOrderSource = source;
     this.orderStartTime = Date.now();
 
-    button.disabled = true;
-    button.classList.add('vine-rocket-pending');
+    if (button) {
+      button.disabled = true;
+      button.classList.add('vine-rocket-pending');
+    }
 
     this.showOverlay('Initializing order...');
 
     try {
       const submitted = await this.performOrder(itemData);
       if (!submitted) {
+        this.emitOrderResult('rocketOrderError', { reason: 'not-submitted' });
         this.resetActiveOrderState();
       }
+      return submitted;
     } catch (error) {
       console.error('[Vine Rocket] Failed to start order:', error);
       this.updateOverlayMessage('Error starting order');
       this.showIframe();
+      this.emitOrderResult('rocketOrderError', { reason: error?.message || 'start-failed' });
       this.resetActiveOrderState();
+      return false;
     }
+  }
+
+  // Emit an order lifecycle event tagged with the active order's asin + source.
+  emitOrderResult(eventName, extra = {}) {
+    this.emit(eventName, {
+      asin: this.activeOrder?.asin || null,
+      source: this.activeOrderSource || 'manual',
+      ...extra
+    });
   }
 
   getCsrfToken() {
@@ -235,14 +259,27 @@ class RocketManager extends BaseManager {
       return;
     }
 
-    const matchingStoredElement = Array.from(addressElements).find((element) => {
-      return element.getAttribute('data-address-id') === this.selectedAddressId;
-    });
+    let matchingStoredElement = null;
+    let checkedElement = null;
+    for (const element of addressElements) {
+      if (
+        !matchingStoredElement &&
+        element.getAttribute('data-address-id') === this.selectedAddressId
+      ) {
+        matchingStoredElement = element;
+      }
 
-    const selectedElement = Array.from(addressElements).find((element) => {
       const radio = element.querySelector('input[type="radio"]');
-      return radio?.checked;
-    }) || matchingStoredElement || addressElements[0];
+      if (!checkedElement && radio?.checked) {
+        checkedElement = element;
+      }
+
+      if (matchingStoredElement && checkedElement) {
+        break;
+      }
+    }
+
+    const selectedElement = checkedElement || matchingStoredElement || addressElements[0];
 
     this.selectedAddressId = selectedElement.getAttribute('data-address-id') || this.selectedAddressId;
     this.selectedLegacyAddressId =
@@ -283,19 +320,41 @@ class RocketManager extends BaseManager {
 
   persistSelectedAddress() {
     if (this.selectedAddressId) {
-      localStorage.setItem(this.addressStorageKeys.addressId, this.selectedAddressId);
+      const storedAddressId = localStorage.getItem(this.addressStorageKeys.addressId);
+      if (storedAddressId !== this.selectedAddressId) {
+        localStorage.setItem(this.addressStorageKeys.addressId, this.selectedAddressId);
+      }
     }
 
     if (this.selectedLegacyAddressId) {
-      localStorage.setItem(this.addressStorageKeys.legacyAddressId, this.selectedLegacyAddressId);
+      const storedLegacyAddressId = localStorage.getItem(this.addressStorageKeys.legacyAddressId);
+      if (storedLegacyAddressId !== this.selectedLegacyAddressId) {
+        localStorage.setItem(this.addressStorageKeys.legacyAddressId, this.selectedLegacyAddressId);
+      }
     }
   }
 
   async performOrder(itemData) {
+    const speculativePromotionPromise = itemData.isParent
+      ? this.fetchPromotionId(itemData.recommendationId, itemData.asin).catch(() => null)
+      : null;
     const resolvedItem = await this.resolveOrderTarget(itemData);
+    const canUseSpeculativePromotion = Boolean(
+      speculativePromotionPromise &&
+      resolvedItem.recommendationId === itemData.recommendationId
+    );
+    const promotionPromise = canUseSpeculativePromotion
+      ? speculativePromotionPromise.then((promotionId) => {
+        if (promotionId) {
+          return promotionId;
+        }
+
+        return this.fetchPromotionId(resolvedItem.recommendationId, resolvedItem.asin);
+      })
+      : this.fetchPromotionId(resolvedItem.recommendationId, resolvedItem.asin);
 
     const [promotionId, offerResult] = await Promise.all([
-      this.fetchPromotionId(resolvedItem.recommendationId, resolvedItem.asin),
+      promotionPromise,
       this.fetchOfferId(
         resolvedItem.recommendationId,
         resolvedItem.asin,
@@ -558,6 +617,7 @@ class RocketManager extends BaseManager {
       this.updateOverlayMessage('Checkout needs attention');
       this.showIframe();
       this.showToast('Checkout reported an error', 'error');
+      this.emitOrderResult('rocketOrderError', { reason: 'checkout-error' });
       this.resetActiveOrderState();
       return;
     }
@@ -574,6 +634,7 @@ class RocketManager extends BaseManager {
         : 'Order placed';
 
       this.showToast(message, 'success', duration);
+      this.emitOrderResult('rocketOrderSuccess', { orderId: event.data.orderId || null, durationMs: duration });
       this.resetActiveOrderState();
     }
   }
@@ -587,6 +648,7 @@ class RocketManager extends BaseManager {
     this.isOrdering = false;
     this.activeButton = null;
     this.activeOrder = null;
+    this.activeOrderSource = null;
     this.orderStartTime = 0;
   }
 
@@ -600,10 +662,19 @@ class RocketManager extends BaseManager {
     }
 
     toast.className = `vine-rocket-toast vine-rocket-toast-${tone}`;
-    toast.innerHTML = `
-      <div class="vine-rocket-toast-title">${message}</div>
-      ${durationMs ? `<div class="vine-rocket-toast-duration">${durationMs}ms</div>` : ''}
-    `;
+    toast.textContent = '';
+
+    const title = document.createElement('div');
+    title.className = 'vine-rocket-toast-title';
+    title.textContent = message;
+    toast.appendChild(title);
+
+    if (durationMs) {
+      const duration = document.createElement('div');
+      duration.className = 'vine-rocket-toast-duration';
+      duration.textContent = `${durationMs}ms`;
+      toast.appendChild(duration);
+    }
 
     toast.style.display = 'block';
     clearTimeout(this.toastTimeout);

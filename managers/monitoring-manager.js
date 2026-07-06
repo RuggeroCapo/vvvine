@@ -1,17 +1,11 @@
 // Monitoring Manager - Monitors for new items and sends notifications
 // Uses ItemsRepository for data persistence
 // Uses in-page fetch to check queues without navigation
-window.VINE_DEFAULT_SOCKET_URL = window.VINE_DEFAULT_SOCKET_URL || (
-  'wss://api.v-helper.com/socket.io/'
-  + '?app_version=3.10.10'
-  + '&countryCode=it'
-  + '&uuid=639e138a-0e43-11f1-9839-fa163effef06'
-  + '&fid=58259'
-  + '&cid=7f1cf6cd0ee4ee0339d1ae05ce67ffc9c95f414b46c987b46b8c3f49f53f2312'
-  + '&device_name=Pumping%20Micro%20Zeppelin%20S-339'
-  + '&EIO=4'
-  + '&transport=websocket'
-);
+// Live monitoring connects to a self-hosted Server-Sent Events (SSE) stream.
+// Source: ../socket-monitor/web/app/api/live/route.ts (emits item_added,
+// item_value_updated and collector_status events).
+window.VINE_DEFAULT_LIVE_URL = window.VINE_DEFAULT_LIVE_URL
+  || 'https://ita-vine-stats.duckdns.org/api/live';
 
 class MonitoringManager extends BaseManager {
   constructor(config) {
@@ -22,18 +16,16 @@ class MonitoringManager extends BaseManager {
     this.newItemsManager = null;
     this.pageDetectionManager = null;
     this.monitoringTimer = null;
-    this.socket = null;
-    this.socketReconnectTimer = null;
-    this.socketEngineConnected = false;
-    this.socketNamespaceConnected = false;
+    this.eventSource = null;
+    this.liveReconnectTimer = null;
 
     // Configuration
     this.config = {
       queues: ['potluck', 'encore', 'last_chance'],  // Which queues to monitor
       searchQuery: '',                                // Search query (only for search mode)
       refreshIntervalSeconds: 300,                    // How often to check (default: 5 min)
-      transportMode: 'polling',                       // polling | socket
-      socketUrl: window.VINE_DEFAULT_SOCKET_URL       // Socket endpoint for advanced mode
+      transportMode: 'polling',                       // polling | live
+      liveUrl: window.VINE_DEFAULT_LIVE_URL           // SSE endpoint for live mode
     };
 
     // Base URL for Amazon Vine (detect from current page)
@@ -60,7 +52,7 @@ class MonitoringManager extends BaseManager {
 
   async setup() {
     console.log('[MonitoringManager] setup() called');
-    
+
     // Initialize repository if not already initialized
     if (!this.repository.isInitialized) {
       console.log('[MonitoringManager] Initializing repository...');
@@ -70,7 +62,7 @@ class MonitoringManager extends BaseManager {
     await this.loadConfiguration();
     this.setupEventListeners();
     await this.loadMonitoringState();
-    
+
     // Add diagnostic function to window for debugging
     window.vineMonitoringDiagnostics = () => {
       console.log('=== Vine Monitoring Diagnostics ===');
@@ -81,7 +73,7 @@ class MonitoringManager extends BaseManager {
       console.log('Page Detection Manager:', this.pageDetectionManager ? 'Set' : 'NOT SET');
       console.log('Timer Active:', this.monitoringTimer ? 'Yes' : 'No');
       console.log('Repository Initialized:', this.repository?.isInitialized);
-      console.log('Event Listeners:', window.vineEventBus?.events.has('startMonitoring') ? 
+      console.log('Event Listeners:', window.vineEventBus?.events.has('startMonitoring') ?
         `${window.vineEventBus.events.get('startMonitoring').length} listener(s)` : 'None');
       console.log('===================================');
       return {
@@ -93,7 +85,7 @@ class MonitoringManager extends BaseManager {
         repositoryInitialized: this.repository?.isInitialized
       };
     };
-    
+
     console.log('[MonitoringManager] setup() complete. Run vineMonitoringDiagnostics() in console for status.');
   }
 
@@ -117,13 +109,21 @@ class MonitoringManager extends BaseManager {
           sessionStorage.setItem('vineMonitoringConfig', JSON.stringify(config));
         }
 
-        if (!config.transportMode || !['polling', 'socket'].includes(config.transportMode)) {
+        // Migrate the deprecated 'socket' transport to the new SSE 'live' mode
+        if (config.transportMode === 'socket') {
+          config.transportMode = 'live';
+          sessionStorage.setItem('vineMonitoringConfig', JSON.stringify(config));
+        }
+
+        if (!config.transportMode || !['polling', 'live'].includes(config.transportMode)) {
           config.transportMode = 'polling';
           sessionStorage.setItem('vineMonitoringConfig', JSON.stringify(config));
         }
 
-        if (typeof config.socketUrl !== 'string') {
-          config.socketUrl = window.VINE_DEFAULT_SOCKET_URL;
+        // Migrate the deprecated socketUrl field and drop stale v-helper URLs
+        if (typeof config.liveUrl !== 'string' || !config.liveUrl) {
+          config.liveUrl = window.VINE_DEFAULT_LIVE_URL;
+          delete config.socketUrl;
           sessionStorage.setItem('vineMonitoringConfig', JSON.stringify(config));
         }
 
@@ -167,9 +167,9 @@ class MonitoringManager extends BaseManager {
     if (this.isMonitoring) {
       // Emit event for UI update
       this.emit('monitoringStateChanged', { isMonitoring: true, config: this.config });
-      if (this.isSocketMode()) {
-        console.log('[MonitoringManager] Resuming socket monitoring...');
-        this.startSocketConnection();
+      if (this.isLiveMode()) {
+        console.log('[MonitoringManager] Resuming live monitoring...');
+        this.startLiveConnection();
       } else {
         // Start the timer to resume monitoring
         this.startMonitoringTimer();
@@ -186,7 +186,7 @@ class MonitoringManager extends BaseManager {
 
   async startMonitoring(config = null) {
     console.log('[MonitoringManager] startMonitoring called with config:', config);
-    
+
     if (this.isMonitoring) {
       console.log('[MonitoringManager] Already monitoring, ignoring start request');
       return;
@@ -212,9 +212,9 @@ class MonitoringManager extends BaseManager {
       return;
     }
 
-    if (this.isSocketMode() && !this.config.socketUrl) {
-      console.error('[MonitoringManager] Cannot start socket monitoring without socket URL');
-      alert('Cannot start socket monitoring: socket URL is missing.');
+    if (this.isLiveMode() && !this.config.liveUrl) {
+      console.error('[MonitoringManager] Cannot start live monitoring without a live URL');
+      alert('Cannot start live monitoring: live stream URL is missing.');
       return;
     }
 
@@ -232,7 +232,7 @@ class MonitoringManager extends BaseManager {
     try {
       await this.sendNotification({
         title: 'Vine Monitoring Started',
-        message: this.isSocketMode()
+        message: this.isLiveMode()
           ? `Monitoring ${queueLabel} via ${monitoringModeLabel}`
           : `Monitoring ${queueLabel} via ${monitoringModeLabel} every ${this.config.refreshIntervalSeconds}s`,
         priority: 'low',
@@ -243,9 +243,9 @@ class MonitoringManager extends BaseManager {
       console.error('[MonitoringManager] Failed to send start notification:', error);
     }
 
-    if (this.isSocketMode()) {
-      console.log('[MonitoringManager] Starting socket monitoring...');
-      this.startSocketConnection();
+    if (this.isLiveMode()) {
+      console.log('[MonitoringManager] Starting live monitoring...');
+      this.startLiveConnection();
     } else {
       // Start in-page monitoring timer
       console.log('[MonitoringManager] Starting monitoring timer...');
@@ -264,7 +264,7 @@ class MonitoringManager extends BaseManager {
 
   async stopMonitoring() {
     console.log('[MonitoringManager] stopMonitoring called');
-    
+
     if (!this.isMonitoring) {
       console.log('[MonitoringManager] Not currently monitoring, ignoring stop request');
       return;
@@ -280,7 +280,7 @@ class MonitoringManager extends BaseManager {
     // Stop the monitoring timer
     console.log('[MonitoringManager] Stopping monitoring timer...');
     this.stopMonitoringTimer();
-    this.disconnectSocket();
+    this.disconnectLive();
 
     console.log('[MonitoringManager] Monitoring stopped successfully');
   }
@@ -310,12 +310,12 @@ class MonitoringManager extends BaseManager {
     }
   }
 
-  isSocketMode() {
-    return this.config.transportMode === 'socket';
+  isLiveMode() {
+    return this.config.transportMode === 'live';
   }
 
   getMonitoringModeLabel() {
-    return this.isSocketMode() ? 'socket stream' : 'polling';
+    return this.isLiveMode() ? 'live stream' : 'polling';
   }
 
   async performManualRefresh() {
@@ -417,7 +417,7 @@ class MonitoringManager extends BaseManager {
 
         this.repository.items.set(item.asin, newDoc);
         hasRepositoryChanges = true;
-        allNewItems.push({ ...newDoc, queue: itemQueue, tileElement: item.tileElement, source: item.source || 'polling', reason: item.reason || '' });
+        allNewItems.push(this.buildAutopickCandidate(newDoc, item, itemQueue));
         continue;
       }
 
@@ -453,7 +453,7 @@ class MonitoringManager extends BaseManager {
       }
 
       if (!existingDoc.notified && !existingDoc.hidden) {
-        allNewItems.push({ ...existingDoc, queue: itemQueue, tileElement: item.tileElement, source: item.source || 'polling', reason: item.reason || '' });
+        allNewItems.push(this.buildAutopickCandidate(existingDoc, item, itemQueue));
       }
     }
 
@@ -474,9 +474,56 @@ class MonitoringManager extends BaseManager {
     if (allNewItems.length > 0) {
       this.injectNewItemTiles(allNewItems);
       await this.notifyAboutNewItemsMultiQueue(allNewItems, Array.from(uniqueQueues));
+      this.emit('autopick:candidates', { items: allNewItems });
     }
 
     return { newItems: allNewItems, queuesChecked: Array.from(uniqueQueues) };
+  }
+
+  buildAutopickCandidate(doc, item, itemQueue) {
+    return {
+      ...doc,
+      queue: itemQueue,
+      tileElement: item.tileElement,
+      source: item.source || 'polling',
+      reason: item.reason || '',
+      price: item.price ?? null,
+      priceSource: item.priceSource || null,
+      recommendationId: item.recommendationId || '',
+      recommendationType: item.recommendationType || '',
+      isParent: Boolean(item.isParent || item.isParentAsin)
+    };
+  }
+
+  parseTileEtv(tile) {
+    const content = tile?.querySelector('.vvp-item-tile-content');
+    if (!content) {
+      return null;
+    }
+
+    const etvElement = content.querySelector('.a-size-base.a-color-secondary') ||
+      Array.from(content.querySelectorAll('span')).find((span) =>
+        /€|\$|£|ETV|tax/i.test(span.textContent)
+      );
+
+    if (!etvElement) {
+      return null;
+    }
+
+    const match = etvElement.textContent.match(/[\d.,]+/);
+    if (!match) {
+      return null;
+    }
+
+    let num = match[0];
+    if (num.includes(',') && num.includes('.')) {
+      num = num.replace(/\./g, '').replace(',', '.');
+    } else if (num.includes(',')) {
+      num = num.replace(',', '.');
+    }
+
+    const value = parseFloat(num);
+    return Number.isFinite(value) ? value : null;
   }
 
   // Fetch HTML from a queue URL
@@ -537,12 +584,23 @@ class MonitoringManager extends BaseManager {
       // Extract image URL
       const imageUrl = tile.querySelector('img')?.getAttribute('src') || '';
 
+      const recommendationId = asinInput?.getAttribute('data-recommendation-id') ||
+        tile.getAttribute('data-recommendation-id') || '';
+      const recommendationType = asinInput?.getAttribute('data-recommendation-type') || 'VINE_FOR_ALL';
+      const isParent = asinInput?.getAttribute('data-is-parent-asin') === 'true';
+      const price = this.parseTileEtv(tile);
+
       items.push({
         asin,
         title,
         url,
         imageUrl,
         queue,
+        recommendationId,
+        recommendationType,
+        isParent,
+        price,
+        priceSource: price != null ? 'tile-etv' : null,
         tileElement: tile  // Keep reference to the parsed tile DOM element
       });
     }
@@ -591,14 +649,14 @@ class MonitoringManager extends BaseManager {
     }
 
     tile.classList.add('vine-new-item');
-    tile.dataset.vineSocketInjected = item?.source === 'socket' ? 'true' : 'false';
+    tile.dataset.vineLiveInjected = item?.source === 'live' ? 'true' : 'false';
 
-    if (item?.source === 'socket') {
-      this.decorateSocketTile(tile, item);
+    if (item?.source === 'live') {
+      this.decorateLiveTile(tile, item);
     }
   }
 
-  decorateSocketTile(tile, item) {
+  decorateLiveTile(tile, item) {
     const content = tile.querySelector('.vvp-item-tile-content');
     if (!content) {
       return;
@@ -611,33 +669,33 @@ class MonitoringManager extends BaseManager {
 
     const badge = document.createElement('div');
     badge.className = 'vine-new-item-badge';
-    badge.textContent = 'SOCKET';
-    badge.title = 'Injected from live socket monitoring';
+    badge.textContent = 'LIVE';
+    badge.title = 'Injected from live monitoring stream';
     content.appendChild(badge);
 
-    const existingMeta = content.querySelector('.vine-socket-meta');
+    const existingMeta = content.querySelector('.vine-live-meta');
     if (existingMeta) {
       existingMeta.remove();
     }
 
     const meta = document.createElement('div');
-    meta.className = 'vine-socket-meta';
+    meta.className = 'vine-live-meta';
 
     const sourceChip = document.createElement('span');
-    sourceChip.className = 'vine-socket-chip vine-socket-chip-source';
+    sourceChip.className = 'vine-live-chip vine-live-chip-source';
     sourceChip.textContent = 'Live';
     meta.appendChild(sourceChip);
 
     if (item?.queue) {
       const queueChip = document.createElement('span');
-      queueChip.className = 'vine-socket-chip vine-socket-chip-queue';
+      queueChip.className = 'vine-live-chip vine-live-chip-queue';
       queueChip.textContent = this.getQueueLabelFromValue(item.queue);
       meta.appendChild(queueChip);
     }
 
     if (item?.reason) {
       const reasonChip = document.createElement('span');
-      reasonChip.className = 'vine-socket-chip vine-socket-chip-reason';
+      reasonChip.className = 'vine-live-chip vine-live-chip-reason';
       reasonChip.textContent = item.reason;
       meta.appendChild(reasonChip);
     }
@@ -670,6 +728,31 @@ class MonitoringManager extends BaseManager {
     if (rocketManager?.processItem && !tile.hasAttribute('data-vine-rocket-processed')) {
       rocketManager.processItem(tile);
     }
+
+    const autopickManager = enhancer.getManager('autopick');
+    if (autopickManager?.scoreTile) {
+      autopickManager.scoreTile(tile);
+    }
+  }
+
+  parseLivePrice(rawItem) {
+    const raw = rawItem.item_value ?? rawItem.itemValue ?? rawItem.value ?? rawItem.price;
+    if (raw == null) {
+      return null;
+    }
+
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      return raw;
+    }
+
+    if (typeof raw === 'object') {
+      const amount = raw.amount ?? raw.displayAmount ?? raw.value;
+      const parsed = parseFloat(String(amount).replace(/[^\d.,]/g, '').replace(',', '.'));
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    const parsed = parseFloat(String(raw).replace(/[^\d.,]/g, '').replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   createTileElementFromItem(item) {
@@ -679,7 +762,7 @@ class MonitoringManager extends BaseManager {
 
     const tile = document.createElement('div');
     tile.className = 'vvp-item-tile vine-new-item';
-    tile.dataset.vineSocketInjected = 'true';
+    tile.dataset.vineLiveInjected = 'true';
     if (item.recommendationId) {
       tile.dataset.recommendationId = item.recommendationId;
     }
@@ -701,8 +784,8 @@ class MonitoringManager extends BaseManager {
 
     const badge = document.createElement('div');
     badge.className = 'vine-new-item-badge';
-    badge.textContent = 'SOCKET';
-    badge.title = 'Injected from live socket monitoring';
+    badge.textContent = 'LIVE';
+    badge.title = 'Injected from live monitoring stream';
     content.appendChild(badge);
 
     if (item.imageUrl) {
@@ -714,23 +797,23 @@ class MonitoringManager extends BaseManager {
     }
 
     const meta = document.createElement('div');
-    meta.className = 'vine-socket-meta';
+    meta.className = 'vine-live-meta';
 
     const sourceChip = document.createElement('span');
-    sourceChip.className = 'vine-socket-chip vine-socket-chip-source';
+    sourceChip.className = 'vine-live-chip vine-live-chip-source';
     sourceChip.textContent = 'Live';
     meta.appendChild(sourceChip);
 
     if (item.queue) {
       const queueChip = document.createElement('span');
-      queueChip.className = 'vine-socket-chip vine-socket-chip-queue';
+      queueChip.className = 'vine-live-chip vine-live-chip-queue';
       queueChip.textContent = this.getQueueLabelFromValue(item.queue);
       meta.appendChild(queueChip);
     }
 
     if (item.reason) {
       const reasonChip = document.createElement('span');
-      reasonChip.className = 'vine-socket-chip vine-socket-chip-reason';
+      reasonChip.className = 'vine-live-chip vine-live-chip-reason';
       reasonChip.textContent = item.reason;
       meta.appendChild(reasonChip);
     }
@@ -875,195 +958,178 @@ class MonitoringManager extends BaseManager {
     return this.config.queues.includes(queue);
   }
 
-  startSocketConnection() {
-    if (!this.isMonitoring || !this.isSocketMode()) {
+  startLiveConnection() {
+    if (!this.isMonitoring || !this.isLiveMode()) {
       return;
     }
 
-    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+    if (this.eventSource
+      && (this.eventSource.readyState === EventSource.OPEN
+        || this.eventSource.readyState === EventSource.CONNECTING)) {
       return;
     }
 
-    const socketUrl = (this.config.socketUrl || '').trim();
-    if (!socketUrl) {
-      this.emitSocketState('error', { message: 'Socket URL is empty' });
+    const liveUrl = (this.config.liveUrl || '').trim();
+    if (!liveUrl) {
+      this.emitLiveState('error', { message: 'Live stream URL is empty' });
       return;
     }
 
-    this.clearSocketReconnectTimer();
-    this.socketEngineConnected = false;
-    this.socketNamespaceConnected = false;
-    this.emitSocketState('connecting');
+    this.clearLiveReconnectTimer();
+    this.emitLiveState('connecting');
 
     try {
-      const socket = new WebSocket(socketUrl);
-      this.socket = socket;
+      // EventSource handles reconnection on transient drops automatically, but
+      // we also schedule our own backoff for hard errors below.
+      const source = new EventSource(liveUrl, { withCredentials: false });
+      this.eventSource = source;
 
-      socket.addEventListener('open', () => {
-        if (this.socket !== socket) {
+      source.addEventListener('open', () => {
+        if (this.eventSource !== source) {
           return;
         }
-        console.log('[MonitoringManager] Socket transport connected');
+        console.log('[MonitoringManager] Live stream connected');
+        this.emitLiveState('connected');
       });
 
-      socket.addEventListener('message', async (event) => {
-        if (this.socket !== socket) {
+      source.addEventListener('message', async (event) => {
+        if (this.eventSource !== source) {
           return;
         }
-
-        await this.handleSocketMessage(event.data, socket);
+        await this.handleLiveMessage(event.data);
       });
 
-      socket.addEventListener('error', () => {
-        if (this.socket !== socket) {
+      source.addEventListener('error', () => {
+        if (this.eventSource !== source) {
           return;
         }
 
-        console.error('[MonitoringManager] Socket connection error');
-        this.emitSocketState('error', { message: 'Socket transport error' });
-      });
-
-      socket.addEventListener('close', (event) => {
-        if (this.socket === socket) {
-          this.socket = null;
+        // EventSource auto-reconnects while readyState is CONNECTING; only treat
+        // a fully CLOSED stream as a hard failure that needs our own retry.
+        if (source.readyState === EventSource.CLOSED) {
+          console.warn('[MonitoringManager] Live stream closed, scheduling reconnect');
+          this.eventSource = null;
+          if (this.isMonitoring && this.isLiveMode()) {
+            this.emitLiveState('reconnecting', { message: 'Live stream closed' });
+            this.scheduleLiveReconnect();
+          } else {
+            this.emitLiveState('disconnected');
+          }
+        } else {
+          this.emitLiveState('reconnecting', { message: 'Live stream interrupted' });
         }
-
-        this.socketEngineConnected = false;
-        this.socketNamespaceConnected = false;
-
-        if (!this.isMonitoring || !this.isSocketMode()) {
-          this.emitSocketState('disconnected', { code: event.code, message: event.reason || 'Socket closed' });
-          return;
-        }
-
-        console.warn('[MonitoringManager] Socket closed, scheduling reconnect', event.code, event.reason);
-        this.emitSocketState('reconnecting', { code: event.code, message: event.reason || 'Socket closed' });
-        this.scheduleSocketReconnect();
       });
     } catch (error) {
-      console.error('[MonitoringManager] Failed to create socket:', error);
-      this.emitSocketState('error', { message: error.message });
-      this.scheduleSocketReconnect();
+      console.error('[MonitoringManager] Failed to open live stream:', error);
+      this.emitLiveState('error', { message: error.message });
+      this.scheduleLiveReconnect();
     }
   }
 
-  disconnectSocket() {
-    this.clearSocketReconnectTimer();
-    this.socketEngineConnected = false;
-    this.socketNamespaceConnected = false;
+  disconnectLive() {
+    this.clearLiveReconnectTimer();
 
-    if (this.socket) {
+    if (this.eventSource) {
       try {
-        this.socket.close(1000, 'Monitoring stopped');
+        this.eventSource.close();
       } catch (error) {
-        console.warn('[MonitoringManager] Failed to close socket cleanly:', error);
+        console.warn('[MonitoringManager] Failed to close live stream cleanly:', error);
       }
-      this.socket = null;
+      this.eventSource = null;
     }
 
-    this.emitSocketState(this.isSocketMode() ? 'disconnected' : 'hidden');
+    this.emitLiveState(this.isLiveMode() ? 'disconnected' : 'hidden');
   }
 
-  scheduleSocketReconnect() {
-    if (!this.isMonitoring || !this.isSocketMode()) {
+  scheduleLiveReconnect() {
+    if (!this.isMonitoring || !this.isLiveMode()) {
       return;
     }
 
-    this.clearSocketReconnectTimer();
-    this.socketReconnectTimer = setTimeout(() => {
-      this.socketReconnectTimer = null;
-      this.startSocketConnection();
+    this.clearLiveReconnectTimer();
+    this.liveReconnectTimer = setTimeout(() => {
+      this.liveReconnectTimer = null;
+      this.startLiveConnection();
     }, 5000);
   }
 
-  clearSocketReconnectTimer() {
-    if (this.socketReconnectTimer) {
-      clearTimeout(this.socketReconnectTimer);
-      this.socketReconnectTimer = null;
+  clearLiveReconnectTimer() {
+    if (this.liveReconnectTimer) {
+      clearTimeout(this.liveReconnectTimer);
+      this.liveReconnectTimer = null;
     }
   }
 
-  emitSocketState(state, extra = {}) {
-    this.emit('monitoringSocketStateChanged', { state, ...extra });
+  emitLiveState(state, extra = {}) {
+    this.emit('monitoringLiveStateChanged', { state, ...extra });
   }
 
-  async handleSocketMessage(message, socket) {
-    if (typeof message !== 'string') {
+  async handleLiveMessage(data) {
+    if (typeof data !== 'string' || !data.trim()) {
       return;
     }
 
-    console.log('[MonitoringManager] Socket message received:', message);
-
-    if (message.startsWith('0')) {
-      this.socketEngineConnected = true;
-      this.emitSocketState('engine_open');
-      socket.send('40');
-      return;
-    }
-
-    if (message === '2') {
-      socket.send('3');
-      return;
-    }
-
-    if (message.startsWith('40')) {
-      this.socketNamespaceConnected = true;
-      this.emitSocketState('connected');
-      return;
-    }
-
-    if (!message.startsWith('42')) {
-      return;
-    }
-
+    let event;
     try {
-      const payload = JSON.parse(message.slice(2));
-      if (!Array.isArray(payload) || payload[0] !== 'newItem') {
-        return;
-      }
-
-      await this.handleSocketNewItem(payload[1]?.item);
+      event = JSON.parse(data);
     } catch (error) {
-      console.error('[MonitoringManager] Failed to parse socket event payload:', error);
+      console.error('[MonitoringManager] Failed to parse live event payload:', error, data);
+      return;
     }
+
+    // The SSE stream emits a discriminated union of events; we only inject new
+    // items. Value updates and collector status are ignored for now.
+    if (!event || event.t !== 'item_added') {
+      return;
+    }
+
+    await this.handleLiveItemAdded(event);
   }
 
-  async handleSocketNewItem(rawItem) {
-    const item = this.normalizeSocketItem(rawItem);
+  async handleLiveItemAdded(event) {
+    const item = this.normalizeLiveItem(event);
     if (!item) {
       return;
     }
 
     if (!this.shouldMonitorQueue(item.queue)) {
-      console.log('[MonitoringManager] Ignoring socket item for non-monitored queue:', item.queue);
+      console.log('[MonitoringManager] Ignoring live item for non-monitored queue:', item.queue);
       return;
     }
 
     const { newItems } = await this.processDetectedItems([item], [item.queue]);
     if (newItems.length > 0) {
-      console.log('[MonitoringManager] Processed socket new item:', item.asin);
+      console.log('[MonitoringManager] Processed live new item:', item.asin);
     }
   }
 
-  normalizeSocketItem(rawItem) {
-    if (!rawItem?.asin) {
+  // Maps an `item_added` SSE event (see ../socket-monitor/web/lib/live-bus.ts)
+  // onto the internal item shape used by processDetectedItems.
+  normalizeLiveItem(event) {
+    const asin = event.a || event.asin;
+    if (!asin) {
       return null;
     }
 
     const normalizedItem = {
-      asin: rawItem.asin,
-      title: rawItem.title || '',
-      imageUrl: rawItem.img_url || rawItem.imageUrl || '',
-      url: rawItem.url || this.buildProductUrl(rawItem.asin),
-      queue: rawItem.queue || 'unknown',
-      reason: rawItem.reason || '',
-      enrollmentGuid: rawItem.enrollment_guid || rawItem.enrollmentGuid || '',
-      isParentAsin: `${rawItem.is_parent_asin ?? rawItem.isParentAsin ?? 'false'}` === 'true',
-      isPreRelease: `${rawItem.is_pre_release ?? rawItem.isPreRelease ?? 'false'}` === 'true',
-      recommendationType: rawItem.recommendation_type || rawItem.recommendationType || '',
-      recommendationId: rawItem.recommendation_id || rawItem.recommendationId || '',
-      source: 'socket'
+      asin,
+      title: event.title || '',
+      imageUrl: event.image_url || event.imageUrl || '',
+      url: this.buildProductUrl(asin),
+      queue: event.queue || 'unknown',
+      reason: '',
+      enrollmentGuid: '',
+      isParentAsin: false,
+      isPreRelease: false,
+      recommendationType: '',
+      recommendationId: '',
+      currency: event.currency || null,
+      source: 'live'
     };
+
+    const livePrice = this.parseLivePrice(event);
+    normalizedItem.price = livePrice;
+    normalizedItem.priceSource = livePrice != null ? 'live' : null;
 
     normalizedItem.recommendationType = this.inferRecommendationType(normalizedItem);
     normalizedItem.recommendationId = this.buildRecommendationId(normalizedItem);
@@ -1126,7 +1192,7 @@ class MonitoringManager extends BaseManager {
   // Scan current page for new items without navigation (used by background script)
   async scanForNewItems() {
     console.log('[MonitoringManager] Scanning current page for new items');
-    
+
     try {
       // Wait for grid to be available
       const grid = document.getElementById('vvp-items-grid');
@@ -1189,6 +1255,66 @@ class MonitoringManager extends BaseManager {
     }
   }
 
+  cleanNotificationTitle(title) {
+    const cleaned = (title || 'Unknown item').replace(/…+$/g, '').trim();
+    return cleaned || 'Unknown item';
+  }
+
+  getNotificationItemUrl(item) {
+    if (item?.url) {
+      return item.url;
+    }
+    if (item?.asin) {
+      return this.buildProductUrl(item.asin);
+    }
+    return window.location.href;
+  }
+
+  formatNotificationItemBlock(item, index) {
+    const asin = item.asin || '—';
+    const title = this.cleanNotificationTitle(item.title);
+    const url = this.getNotificationItemUrl(item);
+    return `${index + 1}. ${asin}\n${title}\n${url}`;
+  }
+
+  buildNotificationItemsBody(items, options = {}) {
+    const { itemsByQueue = null } = options;
+
+    if (itemsByQueue) {
+      let body = '';
+      let itemIndex = 0;
+
+      for (const queue of Object.keys(itemsByQueue)) {
+        const queueItems = itemsByQueue[queue];
+        const queueLabel = this.getQueueLabelFromValue(queue);
+        body += `\n${queueLabel} (${queueItems.length}):\n`;
+
+        for (const item of queueItems) {
+          body += `${this.formatNotificationItemBlock(item, itemIndex)}\n\n`;
+          itemIndex++;
+        }
+      }
+
+      return body.trimEnd();
+    }
+
+    return items
+      .map((item, index) => this.formatNotificationItemBlock(item, index))
+      .join('\n\n');
+  }
+
+  groupItemsByQueue(items) {
+    const itemsByQueue = {};
+    for (const item of items) {
+      const queue = item.queue || 'unknown';
+      if (!itemsByQueue[queue]) {
+        itemsByQueue[queue] = [];
+      }
+      itemsByQueue[queue].push(item);
+    }
+    return itemsByQueue;
+  }
+
   // Send aggregated notification for multi-queue check
   async notifyAboutNewItemsMultiQueue(items, queuesChecked) {
     if (!items || items.length === 0) return;
@@ -1196,59 +1322,16 @@ class MonitoringManager extends BaseManager {
     try {
       // Play beep sound for new items
       this.playBeepSound();
-      // Group items by queue
-      const itemsByQueue = {};
-      for (const item of items) {
-        const queue = item.queue || 'unknown';
-        if (!itemsByQueue[queue]) {
-          itemsByQueue[queue] = [];
-        }
-        itemsByQueue[queue].push(item);
-      }
-
-      // Format items for notification
-      const formatItemForNotification = (item, index) => {
-        let title = item.title || 'Unknown item';
-
-        // Remove trailing ellipsis added by Amazon (…)
-        title = title.replace(/…+$/g, '').trim();
-
-        // Truncate long titles (keep first 80 chars)
-        const maxLength = 80;
-        if (title.length > maxLength) {
-          title = title.substring(0, maxLength).trim() + '…';
-        }
-
-        // Add numbered bullet for better readability
-        return `${index + 1}. ${title}`;
-      };
-
-      // Build message with items grouped by queue
-      let message = '';
-      let itemIndex = 0;
-
-      for (const queue of Object.keys(itemsByQueue)) {
-        const queueItems = itemsByQueue[queue];
-        const queueLabel = this.getQueueLabelFromValue(queue);
-
-        message += `\n*${queueLabel}* (${queueItems.length}):\n`;
-
-        const itemsToShow = queueItems.slice(0, 3); // Show first 3 items per queue
-        for (const item of itemsToShow) {
-          message += formatItemForNotification(item, itemIndex) + '\n';
-          itemIndex++;
-        }
-
-        if (queueItems.length > 3) {
-          message += `_... and ${queueItems.length - 3} more from ${queueLabel}_\n`;
-        }
-      }
-
+      const itemsByQueue = this.groupItemsByQueue(items);
       const queuesLabel = queuesChecked.map(q => this.getQueueLabelFromValue(q)).join(', ');
+      const summary = `Found across ${queuesChecked.length} queue${queuesChecked.length > 1 ? 's' : ''}: ${queuesLabel}`;
+      const itemsBody = this.buildNotificationItemsBody(items, { itemsByQueue });
 
       await this.sendNotification({
         title: `${items.length} New Vine Item${items.length > 1 ? 's' : ''}!`,
-        message: `Found across ${queuesChecked.length} queue${queuesChecked.length > 1 ? 's' : ''}: ${queuesLabel}\n${message}`,
+        message: `${summary}\n\n${itemsBody}`,
+        items,
+        itemsByQueue,
         priority: 'high',
         tags: ['vine', 'new-items', 'multi-queue'],
         url: window.location.href
@@ -1283,39 +1366,13 @@ class MonitoringManager extends BaseManager {
     try {
       // Play beep sound for new items
       this.playBeepSound();
-      // Format items for notification with truncation and cleaning
-      const formatItemForNotification = (item, index) => {
-        let title = item.title || 'Unknown item';
-
-        // Remove trailing ellipsis added by Amazon (…)
-        title = title.replace(/…+$/g, '').trim();
-
-        // Truncate long titles (keep first 80 chars)
-        const maxLength = 80;
-        if (title.length > maxLength) {
-          title = title.substring(0, maxLength).trim() + '…';
-        }
-
-        // Add numbered bullet for better readability
-        return `${index + 1}. ${title}`;
-      };
-
-      // Format list of items (limit to first 5)
-      const itemsToShow = items.slice(0, 5);
-      const itemsList = itemsToShow
-        .map((item, index) => formatItemForNotification(item, index))
-        .join('\n\n'); // Double newline for better spacing
-
-      // Add "and X more" text if there are more items
-      const moreText = items.length > 5
-        ? `\n\n_... and ${items.length - 5} more item${items.length - 5 > 1 ? 's' : ''}_`
-        : '';
-
       const queueLabel = this.getQueueLabel();
+      const itemsBody = this.buildNotificationItemsBody(items);
 
       await this.sendNotification({
         title: `${items.length} New Vine Item${items.length > 1 ? 's' : ''} on ${queueLabel}!`,
-        message: `${itemsList}${moreText}`,
+        message: itemsBody,
+        items,
         priority: 'high',
         tags: ['vine', 'new-items'],
         url: window.location.href
@@ -1330,7 +1387,7 @@ class MonitoringManager extends BaseManager {
 
   async sendNotification(notification) {
     console.log('[MonitoringManager] sendNotification called:', notification);
-    
+
     if (!this.notificationProvider) {
       console.error('[MonitoringManager] No notification provider available');
       return false;
@@ -1422,6 +1479,6 @@ class MonitoringManager extends BaseManager {
   cleanup() {
     super.cleanup();
     this.stopMonitoringTimer();
-    this.disconnectSocket();
+    this.disconnectLive();
   }
 }

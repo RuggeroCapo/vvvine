@@ -1,0 +1,355 @@
+{.
+  "version": 1,
+  "meta": {
+    "profile": "ruggero-wishlist",
+    "description": "Affinity rules derived from Ruggero's Amazon wishlist (Lista dei desideri). Strong signals: 3D printing, smart home (Matter/HomeKit), premium tech (drones, AR, audio), networking, maker tools, LEGO Icons, home furniture/decor, kitchenware, wearables.",
+    "source": "amazon-wishlist-Lista dei desideri di Ruggero-1782144204356.json",
+    "generatedAt": "2026-06-22"
+  },
+  "rules": [
+    {
+      "type": "keyword",
+      "pattern": "filament",
+      "score": 10,
+      "label": "3D printing",
+      "mustPick": true
+    },
+    {
+      "type": "keyword",
+      "pattern": "filamento",
+      "score": 10,
+      "label": "3D printing",
+      "mustPick": true
+    },
+    {
+      "type": "keyword",
+      "pattern": "resin",
+      "score": 9,
+      "label": "3D printing",
+      "mustPick": true
+    },
+    {
+      "type": "phrase",
+      "pattern": "stampante 3d",
+      "score": 10,
+      "label": "3D printing"
+    },
+    {
+      "type": "phrase",
+      "pattern": "3d printer",
+      "score": 10,
+      "label": "3D printing"
+    },
+    {
+      "type": "brand",
+      "pattern": "Anycubic",
+      "score": 10,
+      "label": "3D printing",
+      "aliases": [
+        "ANY CUBIC"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Creality",
+      "score": 10,
+      "label": "3D printing",
+      "aliases": [
+        "SPARKX"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Bambu",
+      "score": 9,
+      "label": "3D printing",
+      "aliases": [
+        "Bambu Lab"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Prusa",
+      "score": 9,
+      "label": "3D printing"
+    },
+    {
+      "type": "brand",
+      "pattern": "Elegoo",
+      "score": 8,
+      "label": "3D printing"
+    },
+    {
+      "type": "brand",
+      "pattern": "DJI",
+      "score": 10,
+      "label": "drones"
+    },
+    {
+      "type": "keyword",
+      "pattern": "drone",
+      "score": 9,
+      "label": "drones"
+    },
+    {
+      "type": "brand",
+      "pattern": "XREAL",
+      "score": 10,
+      "label": "AR/VR",
+      "aliases": [
+        "Nreal"
+      ]
+    },
+    {
+      "type": "phrase",
+      "pattern": "ar occhiali",
+      "score": 9,
+      "label": "AR/VR"
+    },
+    {
+      "type": "phrase",
+      "pattern": "ar glasses",
+      "score": 9,
+      "label": "AR/VR"
+    },
+    {
+      "type": "brand",
+      "pattern": "Sonos",
+      "score": 10,
+      "label": "audio"
+    },
+    {
+      "type": "brand",
+      "pattern": "TP-Link",
+      "score": 9,
+      "label": "networking",
+      "aliases": [
+        "TPLink",
+        "TP Link"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Ubiquiti",
+      "score": 8,
+      "label": "networking",
+      "aliases": [
+        "UniFi"
+      ]
+    },
+    {
+      "type": "phrase",
+      "pattern": "wi-fi 6",
+      "score": 8,
+      "label": "networking"
+    },
+    {
+      "type": "phrase",
+      "pattern": "wifi 6",
+      "score": 8,
+      "label": "networking"
+    },
+    {
+      "type": "keyword",
+      "pattern": "router",
+      "score": 7,
+      "label": "networking"
+    },
+    {
+      "type": "keyword",
+      "pattern": "mesh",
+      "score": 7,
+      "label": "networking"
+    },
+    {
+      "type": "brand",
+      "pattern": "SwitchBot",
+      "score": 9,
+      "label": "smart home",
+      "aliases": [
+        "Switch Bot"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Aqara",
+      "score": 8,
+      "label": "smart home"
+    },
+    {
+      "type": "brand",
+      "pattern": "Shelly",
+      "score": 8,
+      "label": "smart home"
+    },
+    {
+      "type": "keyword",
+      "pattern": "HomeKit",
+      "score": 8,
+      "label": "smart home"
+    },
+    {
+      "type": "keyword",
+      "pattern": "Matter",
+      "score": 8,
+      "label": "smart home"
+    },
+    {
+      "type": "phrase",
+      "pattern": "smart home",
+      "score": 7,
+      "label": "smart home"
+    },
+    {
+      "type": "brand",
+      "pattern": "Tineco",
+      "score": 9,
+      "label": "home appliances"
+    },
+    {
+      "type": "phrase",
+      "pattern": "aspirapolvere",
+      "score": 7,
+      "label": "home appliances"
+    },
+    {
+      "type": "brand",
+      "pattern": "LG",
+      "score": 8,
+      "label": "monitors"
+    },
+    {
+      "type": "brand",
+      "pattern": "Dell",
+      "score": 7,
+      "label": "monitors",
+      "aliases": [
+        "Alienware"
+      ]
+    },
+    {
+      "type": "keyword",
+      "pattern": "monitor",
+      "score": 7,
+      "label": "monitors"
+    },
+    {
+      "type": "keyword",
+      "pattern": "4K",
+      "score": 7,
+      "label": "monitors"
+    },
+    {
+      "type": "brand",
+      "pattern": "LEGO",
+      "score": 9,
+      "label": "collectibles"
+    },
+    {
+      "type": "brand",
+      "pattern": "Withings",
+      "score": 9,
+      "label": "wearables"
+    },
+    {
+      "type": "phrase",
+      "pattern": "scanwatch",
+      "score": 9,
+      "label": "wearables"
+    },
+    {
+      "type": "keyword",
+      "pattern": "smartwatch",
+      "score": 7,
+      "label": "wearables"
+    },
+    {
+      "type": "brand",
+      "pattern": "Wowstick",
+      "score": 9,
+      "label": "maker tools"
+    },
+    {
+      "type": "brand",
+      "pattern": "iFixit",
+      "score": 8,
+      "label": "maker tools"
+    },
+    {
+      "type": "brand",
+      "pattern": "Swiss Tech",
+      "score": 7,
+      "label": "maker tools",
+      "aliases": [
+        "Swiss+Tech",
+        "SwissTech"
+      ]
+    },
+    {
+      "type": "phrase",
+      "pattern": "cacciavite di precisione",
+      "score": 8,
+      "label": "maker tools"
+    },
+    {
+      "type": "phrase",
+      "pattern": "precision screwdriver",
+      "score": 8,
+      "label": "maker tools"
+    },
+    {
+      "type": "phrase",
+      "pattern": "electric screwdriver",
+      "score": 8,
+      "label": "maker tools"
+    },
+    {
+      "type": "keyword",
+      "pattern": "multitool",
+      "score": 7,
+      "label": "maker tools"
+    },
+    {
+      "type": "brand",
+      "pattern": "Incapto",
+      "score": 8,
+      "label": "kitchenware"
+    },
+    {
+      "type": "phrase",
+      "pattern": "coffee container",
+      "score": 8,
+      "label": "kitchenware"
+    },
+    {
+      "type": "phrase",
+      "pattern": "contenitore per caffè",
+      "score": 8,
+      "label": "kitchenware"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\b(ssd|nvme|m\\.2)\\b",
+      "score": 8,
+      "label": "storage"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\b(fdm|sla|msla|dlp)\\b",
+      "score": 8,
+      "label": "3D printing"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\b(wi-?fi\\s*6e?|ax\\d{3,4})\\b",
+      "score": 8,
+      "label": "networking"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\b(nozzle|hotend|extruder|build plate|pebuild)\\b",
+      "score": 9,
+      "label": "3D printing"
+    },
+  ]
+}

@@ -96,6 +96,72 @@
       </div>
     </div>
 
+    <!-- Autopick Scoring Card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon">🎯</div>
+        <h2 class="card-title">Autopick Scoring</h2>
+      </div>
+      <div class="card-content">
+        <p class="card-description">Score Vine items with JSON rules and optional Gemini AI. Ordering is not triggered yet — scores appear on item cards.</p>
+
+        <div class="toggle-container">
+          <div class="toggle-info">
+            <h3>Enable Scoring</h3>
+            <p>Show confidence badges on Vine items</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="autopick-enabled" class="toggle-input">
+            <div class="toggle-slider"></div>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="autopick-threshold">Threshold (%)</label>
+          <input type="number" id="autopick-threshold" min="0" max="100" value="75" class="text-input">
+        </div>
+
+        <div class="toggle-container">
+          <div class="toggle-info">
+            <h3>AI Fallback (Gemini)</h3>
+            <p>Score unmatched items via LLM when decisive</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="autopick-llm-enabled" class="toggle-input">
+            <div class="toggle-slider"></div>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="autopick-gemini-model">Gemini Model</label>
+          <input type="text" id="autopick-gemini-model" placeholder="gemini-2.0-flash" class="text-input">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="autopick-gemini-api-key">Gemini API Key</label>
+          <input type="password" id="autopick-gemini-api-key" placeholder="AIza..." class="text-input" autocomplete="off">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="autopick-preferences">AI Preferences Prompt</label>
+          <textarea id="autopick-preferences" rows="3" class="text-input" placeholder="e.g. Prefer 3D printing, smart home, audio, networking..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="autopick-llm-timeout">AI Timeout (ms)</label>
+          <input type="number" id="autopick-llm-timeout" min="500" max="10000" value="1200" class="text-input">
+        </div>
+
+        <div class="button-row">
+          <button id="save-autopick-config" class="btn btn-small btn-primary">
+            <span class="btn-icon">💾</span>
+            Save
+          </button>
+        </div>
+        <div id="autopick-status" class="telegram-status" style="display: none;"></div>
+      </div>
+    </div>
+
     <!-- Telegram Settings Card -->
     <div class="card">
       <div class="card-header">

@@ -8,7 +8,7 @@ class UIManager extends BaseManager {
 
   async setup() {
     console.log('[Vine Enhancer] UIManager setup starting...');
-    
+
     // Wait for the tab content (exists even without products)
     try {
       await this.waitForElement('.vvp-tab-content');
@@ -17,7 +17,7 @@ class UIManager extends BaseManager {
       console.error('[Vine Enhancer] Failed to find .vvp-tab-content:', error);
       return;
     }
-    
+
     this.createControlPanel();
     this.setupControlListeners();
     this.setupStatusUpdates();
@@ -107,9 +107,9 @@ class UIManager extends BaseManager {
             <span class="vine-monitoring-label">Mode:</span>
             <div class="vine-monitoring-mode-toggle">
               <button class="vine-monitoring-mode-btn vine-monitoring-mode-active" data-monitoring-mode="polling">Polling</button>
-              <button class="vine-monitoring-mode-btn" data-monitoring-mode="socket">Socket</button>
+              <button class="vine-monitoring-mode-btn" data-monitoring-mode="live">Live</button>
             </div>
-            <span id="monitoring-socket-state" class="vine-monitoring-socket-state vine-monitoring-socket-idle">Idle</span>
+            <span id="monitoring-live-state" class="vine-monitoring-live-state vine-monitoring-live-idle">Idle</span>
           </div>
           <div id="monitoring-refresh-section" class="vine-monitoring-section">
             <span class="vine-monitoring-label">Refresh:</span>
@@ -125,14 +125,14 @@ class UIManager extends BaseManager {
               <span class="vine-interval-unit">sec</span>
             </div>
           </div>
-          <div id="monitoring-socket-section" class="vine-monitoring-section" style="display: none;">
-            <span class="vine-monitoring-label">Socket:</span>
+          <div id="monitoring-live-section" class="vine-monitoring-section" style="display: none;">
+            <span class="vine-monitoring-label">Live:</span>
             <input
               type="text"
-              id="monitoring-socket-url-input"
-              class="vine-monitoring-socket-input"
-              placeholder="wss://api.v-helper.com/socket.io/?..."
-              value="${this.getDefaultSocketUrl()}"
+              id="monitoring-live-url-input"
+              class="vine-monitoring-live-input"
+              placeholder="https://ita-vine-stats.duckdns.org/api/live"
+              value="${this.getDefaultLiveUrl()}"
               autocomplete="off"
               spellcheck="false"
             >
@@ -150,20 +150,20 @@ class UIManager extends BaseManager {
     } else {
       console.error('[Vine Enhancer] Could not find .vvp-items-button-and-search-container');
     }
-    
+
     // Add CSS for the slider
     this.addSliderStyles();
-    
+
     // Initialize view mode
     this.currentView = 'card'; // 'card' or 'table'
-    
+
     // Set initial view state on body
     document.body.setAttribute('data-vine-view', 'card');
   }
 
   addSliderStyles() {
     if (document.getElementById('vine-slider-styles')) return;
-    
+
     const style = document.createElement('style');
     style.id = 'vine-slider-styles';
     style.textContent = `
@@ -231,8 +231,8 @@ class UIManager extends BaseManager {
     document.head.appendChild(style);
   }
 
-  getDefaultSocketUrl() {
-    return window.VINE_DEFAULT_SOCKET_URL || '';
+  getDefaultLiveUrl() {
+    return window.VINE_DEFAULT_LIVE_URL || '';
   }
 
   setupControlListeners() {
@@ -286,14 +286,14 @@ class UIManager extends BaseManager {
 
   setupMonitoringControls() {
     console.log('[UIManager] Setting up monitoring controls');
-    
+
     // Toggle monitoring button
     const monitoringToggle = document.getElementById('monitoring-toggle');
     if (!monitoringToggle) {
       console.error('[UIManager] monitoring-toggle button not found!');
       return;
     }
-    
+
     monitoringToggle.addEventListener('click', () => {
       console.log('[UIManager] Monitor button clicked');
       this.toggleMonitoring();
@@ -364,8 +364,8 @@ class UIManager extends BaseManager {
       this.updateMonitoringUI(data.isMonitoring, data.config);
     });
 
-    this.on('monitoringSocketStateChanged', (data) => {
-      this.updateSocketState(data?.state, data);
+    this.on('monitoringLiveStateChanged', (data) => {
+      this.updateLiveState(data?.state, data);
     });
 
     // Sync UI with persisted monitoring state (handles case where
@@ -469,7 +469,7 @@ class UIManager extends BaseManager {
 
   getMonitoringConfig() {
     console.log('[UIManager] getMonitoringConfig called');
-    
+
     // Get current queue from URL
     const currentQueue = this.getCurrentQueue();
     console.log('[UIManager] Current queue:', currentQueue);
@@ -485,34 +485,34 @@ class UIManager extends BaseManager {
     const refreshIntervalSeconds = parseInt(intervalElement.value) || 300;
     console.log('[UIManager] Refresh interval:', refreshIntervalSeconds);
     const selectedMode = document.querySelector('.vine-monitoring-mode-btn.vine-monitoring-mode-active')?.dataset.monitoringMode || 'polling';
-    const socketUrl = document.getElementById('monitoring-socket-url-input')?.value?.trim() || '';
+    const liveUrl = document.getElementById('monitoring-live-url-input')?.value?.trim() || '';
 
     const config = {
       queues: [currentQueue],
       refreshIntervalSeconds,
       searchQuery: '',
       transportMode: selectedMode,
-      socketUrl
+      liveUrl
     };
 
-    if (selectedMode === 'socket' && !socketUrl) {
-      alert('Please enter a socket URL before starting socket monitoring.');
+    if (selectedMode === 'live' && !liveUrl) {
+      alert('Please enter a live stream URL before starting live monitoring.');
       return null;
     }
-    
+
     console.log('[UIManager] Final config:', config);
     return config;
   }
 
   updateMonitoringUI(isMonitoring, config) {
     console.log('[UIManager] updateMonitoringUI called:', { isMonitoring, config });
-    
+
     const monitoringToggle = document.getElementById('monitoring-toggle');
     if (!monitoringToggle) {
       console.error('[UIManager] monitoring-toggle button not found!');
       return;
     }
-    
+
     const icon = monitoringToggle.querySelector('.vine-btn-icon');
     const text = monitoringToggle.querySelector('.vine-btn-text');
 
@@ -546,7 +546,7 @@ class UIManager extends BaseManager {
     // Update queue display
     this.updateQueueDisplay();
 
-    const transportMode = config.transportMode === 'socket' ? 'socket' : 'polling';
+    const transportMode = config.transportMode === 'live' ? 'live' : 'polling';
     this.setMonitoringMode(transportMode, false);
 
     // Update interval input and highlight matching preset
@@ -556,14 +556,14 @@ class UIManager extends BaseManager {
       this.highlightPreset(config.refreshIntervalSeconds);
     }
 
-    const socketInput = document.getElementById('monitoring-socket-url-input');
-    if (socketInput) {
-      socketInput.value = config.socketUrl || this.getDefaultSocketUrl();
+    const liveInput = document.getElementById('monitoring-live-url-input');
+    if (liveInput) {
+      liveInput.value = config.liveUrl || this.getDefaultLiveUrl();
     }
   }
 
   setMonitoringMode(mode, updateState = true) {
-    const normalizedMode = mode === 'socket' ? 'socket' : 'polling';
+    const normalizedMode = mode === 'live' ? 'live' : 'polling';
     const modeButtons = document.querySelectorAll('[data-monitoring-mode]');
 
     modeButtons.forEach(btn => {
@@ -571,50 +571,49 @@ class UIManager extends BaseManager {
     });
 
     const refreshSection = document.getElementById('monitoring-refresh-section');
-    const socketSection = document.getElementById('monitoring-socket-section');
+    const liveSection = document.getElementById('monitoring-live-section');
 
     if (refreshSection) {
-      refreshSection.style.display = normalizedMode === 'socket' ? 'none' : 'flex';
+      refreshSection.style.display = normalizedMode === 'live' ? 'none' : 'flex';
     }
 
-    if (socketSection) {
-      socketSection.style.display = normalizedMode === 'socket' ? 'flex' : 'none';
+    if (liveSection) {
+      liveSection.style.display = normalizedMode === 'live' ? 'flex' : 'none';
     }
 
     if (updateState) {
-      this.updateSocketState(normalizedMode === 'socket' ? 'idle' : 'hidden');
+      this.updateLiveState(normalizedMode === 'live' ? 'idle' : 'hidden');
     }
   }
 
-  updateSocketState(state, data = {}) {
-    const socketState = document.getElementById('monitoring-socket-state');
-    if (!socketState) return;
+  updateLiveState(state, data = {}) {
+    const liveState = document.getElementById('monitoring-live-state');
+    if (!liveState) return;
 
     const normalizedState = state || 'idle';
     const labelMap = {
       hidden: 'Polling',
       idle: 'Idle',
       connecting: 'Connecting',
-      engine_open: 'Handshake',
       connected: 'Connected',
       reconnecting: 'Reconnecting',
       disconnected: 'Disconnected',
       error: 'Error'
     };
 
-    socketState.textContent = labelMap[normalizedState] || 'Idle';
-    socketState.className = 'vine-monitoring-socket-state';
+    liveState.textContent = labelMap[normalizedState] || 'Idle';
+    liveState.className = 'vine-monitoring-live-state';
 
     if (normalizedState !== 'hidden') {
-      socketState.classList.add(`vine-monitoring-socket-${normalizedState.replace(/_/g, '-')}`);
+      liveState.classList.add(`vine-monitoring-live-${normalizedState.replace(/_/g, '-')}`);
     }
 
     if (data.message) {
-      socketState.title = data.message;
+      liveState.title = data.message;
     } else if (data.code) {
-      socketState.title = `Socket state: ${normalizedState} (${data.code})`;
+      liveState.title = `Live state: ${normalizedState} (${data.code})`;
     } else {
-      socketState.title = `Socket state: ${normalizedState}`;
+      liveState.title = `Live state: ${normalizedState}`;
     }
   }
 
@@ -680,6 +679,12 @@ class UIManager extends BaseManager {
       this.updateStatusInfo();
     });
 
+    this.on('autopick:scored', () => {
+      if (this.currentView === 'table') {
+        this.showTableView();
+      }
+    });
+
     // Listen for table row visibility updates
     this.on('updateTableRowVisibility', (data) => {
       this.updateTableRow(data.itemId, { visible: data.visible });
@@ -714,7 +719,7 @@ class UIManager extends BaseManager {
     const notification = document.createElement('div');
     notification.className = `vine-notification vine-notification-${type}`;
     notification.textContent = message;
-    
+
     // Style the notification
     Object.assign(notification.style, {
       position: 'fixed',
@@ -794,7 +799,7 @@ class UIManager extends BaseManager {
 
     // Build table from grid items
     const items = Array.from(grid.querySelectorAll('.vvp-item-tile'));
-    
+
     const tableHTML = this.buildTableHTML(items);
     tableContainer.innerHTML = tableHTML;
 
@@ -806,37 +811,63 @@ class UIManager extends BaseManager {
     // CSS will handle the display via data-vine-view attribute
   }
 
+  getAutopickSourceLabel(source) {
+    switch (source) {
+      case 'rule':
+        return 'Rules';
+      case 'llm':
+        return 'AI';
+      default:
+        return '—';
+    }
+  }
+
+  getAutopickScoreHtml(item) {
+    const confidence = item.dataset.vineAutopickConfidence;
+    const source = item.dataset.vineAutopickSource;
+
+    if (!confidence) {
+      return '<span class="vine-table-muted">—</span>';
+    }
+
+    return `<span class="vine-table-autopick vine-autopick-${confidence >= 90 ? 'high' : confidence >= 75 ? 'mid' : confidence >= 50 ? 'low' : 'min'}">
+      ${confidence}%
+      <span class="vine-table-autopick-source">${this.getAutopickSourceLabel(source)}</span>
+    </span>`;
+  }
+
   buildTableHTML(items) {
     const rows = items.map(item => {
       // Extract title and link
       const titleElement = item.querySelector('.vvp-item-product-title-container a');
       const title = titleElement?.textContent.trim() || 'N/A';
       const link = titleElement?.href || '#';
-      
+
       // Extract image
       const image = item.querySelector('img')?.src || '';
-      
+
       // Extract ETV - look for the tax value in the content
       let etv = 'N/A';
       const content = item.querySelector('.vvp-item-tile-content');
       if (content) {
         // Try to find ETV in various possible locations
-        const etvElement = content.querySelector('.a-size-base.a-color-secondary') || 
-                          content.querySelector('[class*="tax"]') ||
-                          Array.from(content.querySelectorAll('span')).find(span => 
-                            span.textContent.includes('$') || span.textContent.includes('ETV')
-                          );
+        const etvElement = content.querySelector('.a-size-base.a-color-secondary') ||
+          content.querySelector('[class*="tax"]') ||
+          Array.from(content.querySelectorAll('span')).find(span =>
+            span.textContent.includes('$') || span.textContent.includes('ETV')
+          );
         if (etvElement) {
           etv = etvElement.textContent.trim();
         }
       }
-      
+
       // Get item states
       const isSeen = item.classList.contains('vine-seen');
       const isBookmarked = item.classList.contains('vine-bookmarked');
       const isNew = item.classList.contains('vine-new-item');
       const itemId = item.dataset.vineItemId || '';
       const isHidden = item.style.display === 'none';
+      const autopickScore = this.getAutopickScoreHtml(item);
 
       return `
         <tr class="vine-table-row ${isSeen ? 'vine-table-row-seen' : ''} ${isBookmarked ? 'vine-table-row-bookmarked' : ''} ${isNew ? 'vine-table-row-new' : ''}" 
@@ -850,6 +881,7 @@ class UIManager extends BaseManager {
             ${isNew ? '<span class="vine-table-badge-new">NEW</span>' : ''}
           </td>
           <td class="vine-table-cell vine-table-cell-etv">${etv}</td>
+          <td class="vine-table-cell vine-table-cell-score">${autopickScore}</td>
           <td class="vine-table-cell vine-table-cell-status">
             ${isSeen ? '<span class="vine-table-badge vine-table-badge-seen">✓ Seen</span>' : '<span class="vine-table-badge">Not Seen</span>'}
             ${isBookmarked ? '<span class="vine-table-badge vine-table-badge-bookmarked">⭐ Bookmarked</span>' : ''}
@@ -873,6 +905,7 @@ class UIManager extends BaseManager {
             <th class="vine-table-header-cell">Image</th>
             <th class="vine-table-header-cell">Product Title</th>
             <th class="vine-table-header-cell">ETV</th>
+            <th class="vine-table-header-cell">Score</th>
             <th class="vine-table-header-cell">Status</th>
             <th class="vine-table-header-cell">Actions</th>
           </tr>
@@ -913,7 +946,7 @@ class UIManager extends BaseManager {
       row.classList.toggle('vine-table-row-seen', updates.seen);
       const statusCell = row.querySelector('.vine-table-cell-status');
       const seenBtn = row.querySelector('[data-action="toggle-seen"]');
-      
+
       if (statusCell) {
         const seenBadge = statusCell.querySelector('.vine-table-badge-seen');
         if (updates.seen && !seenBadge) {
@@ -922,7 +955,7 @@ class UIManager extends BaseManager {
           seenBadge.remove();
         }
       }
-      
+
       if (seenBtn) {
         seenBtn.textContent = updates.seen ? '👁️' : '👁️‍🗨️';
         seenBtn.title = updates.seen ? 'Mark as Unseen' : 'Mark as Seen';
@@ -933,7 +966,7 @@ class UIManager extends BaseManager {
       row.classList.toggle('vine-table-row-bookmarked', updates.bookmarked);
       const statusCell = row.querySelector('.vine-table-cell-status');
       const bookmarkBtn = row.querySelector('[data-action="toggle-bookmark"]');
-      
+
       if (statusCell) {
         const bookmarkBadge = statusCell.querySelector('.vine-table-badge-bookmarked');
         if (updates.bookmarked && !bookmarkBadge) {
@@ -942,7 +975,7 @@ class UIManager extends BaseManager {
           bookmarkBadge.remove();
         }
       }
-      
+
       if (bookmarkBtn) {
         bookmarkBtn.textContent = updates.bookmarked ? '⭐' : '☆';
         bookmarkBtn.title = updates.bookmarked ? 'Remove Bookmark' : 'Add Bookmark';

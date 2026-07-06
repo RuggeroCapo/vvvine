@@ -1,4 +1,4 @@
-// Notification Provider Manager - Abstract notification system with ntfy support
+// Notification Provider Manager - Abstract notification system
 // Designed to be easily extensible for Telegram and other providers
 
 // Abstract base class for notification providers
@@ -34,100 +34,210 @@ class NotificationProvider {
   }
 }
 
-// ntfy.sh notification provider
-class NtfyNotificationProvider extends NotificationProvider {
-  constructor(config = {}) {
-    super();
-    this.topic = config.topic || 'vine-rugg-potluck'; // Default topic
-    this.server = config.server || 'https://ntfy.sh';
-    this.isConnected = false;
-  }
-
-  async send(notification) {
-    try {
-      const { title, message, priority = 'default', tags = [], url } = notification;
-
-      const notificationTitle = title || 'Amazon Vine Notification';
-      const notificationMessage = message || 'New items detected';
-      const notificationUrl = url || window.location.href;
-
-      // Build ntfy URL with topic
-      const ntfyUrl = `${this.server}/${this.topic}`;
-
-      // Build ntfy payload (without topic field)
-      const payload = {
-        message: notificationMessage,
-        title: notificationTitle,
-        priority: priority, // min, low, default, high, urgent
-        tags: tags,
-        click: notificationUrl
-      };
-
-      const response = await fetch(ntfyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`ntfy HTTP ${response.status}: ${errorText}`);
-      }
-
-      await response.json();
-      this.isConnected = true;
-      return true;
-
-    } catch (error) {
-      console.error('❌ NtfyProvider: Failed to send notification:', error);
-      console.error('Error details:', error.message);
-      console.error('Error stack:', error.stack);
-      this.isConnected = false;
-      throw error;
-    }
-  }
-
-  async testConnection() {
-    try {
-      // Send a test notification
-      await this.send({
-        title: 'Test Notification',
-        message: 'Amazon Vine monitoring is working! 🍇',
-        priority: 'low',
-        tags: ['test', 'vine']
-      });
-      return true;
-    } catch (error) {
-      console.error('NtfyProvider: Connection test failed:', error);
-      return false;
-    }
-  }
-
-  getProviderName() {
-    return 'ntfy';
-  }
-
-  getTopic() {
-    return this.topic;
-  }
-
-  getServer() {
-    return this.server;
-  }
-
-  getSubscribeUrl() {
-    return `${this.server}/${this.topic}`;
-  }
-}
-
-// Future provider placeholder - Telegram
+// Telegram notification provider
 class TelegramNotificationProvider extends NotificationProvider {
   constructor(config = {}) {
     super();
     this.botToken = config.botToken;
     this.chatId = config.chatId;
+    this.maxMessageLength = 4096;
+  }
+
+  static escapeHtml(text) {
+    return String(text ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  static escapeHtmlAttribute(text) {
+    return TelegramNotificationProvider.escapeHtml(text).replace(/"/g, '&quot;');
+  }
+
+  static cleanItemTitle(title) {
+    const cleaned = (title || 'Unknown item').replace(/…+$/g, '').trim();
+    return cleaned || 'Unknown item';
+  }
+
+  getProductUrl(item) {
+    if (item?.url) {
+      return item.url;
+    }
+
+    const match = window.location?.href?.match(/(https:\/\/www\.amazon\.[^/]+)/);
+    const origin = match ? match[1] : 'https://www.amazon.it';
+    return item?.asin ? `${origin}/dp/${item.asin}` : '';
+  }
+
+  getQueueLabel(queue) {
+    switch (queue) {
+      case 'potluck':
+        return 'Potluck';
+      case 'encore':
+        return 'Encore';
+      case 'last_chance':
+        return 'Last Chance';
+      case 'search':
+        return 'Search';
+      default:
+        return queue || 'Unknown';
+    }
+  }
+
+  formatItemBlockHtml(item, index) {
+    const asin = TelegramNotificationProvider.escapeHtml(item.asin || '—');
+    const title = TelegramNotificationProvider.escapeHtml(
+      TelegramNotificationProvider.cleanItemTitle(item.title)
+    );
+    const productUrl = this.getProductUrl(item);
+    const link = productUrl
+      ? `\n<a href="${TelegramNotificationProvider.escapeHtmlAttribute(productUrl)}">Open product</a>`
+      : '';
+
+    return `<b>${index + 1}.</b> <code>${asin}</code>\n${title}${link}`;
+  }
+
+  buildItemSectionsHtml(notification) {
+    const { items = [], itemsByQueue = null } = notification;
+    if (!Array.isArray(items) || items.length === 0) {
+      return [];
+    }
+
+    if (itemsByQueue) {
+      const sections = [];
+      let itemIndex = 0;
+
+      for (const queue of Object.keys(itemsByQueue)) {
+        const queueItems = itemsByQueue[queue];
+        const queueLabel = TelegramNotificationProvider.escapeHtml(this.getQueueLabel(queue));
+        let section = `<b>${queueLabel}</b> (${queueItems.length}):\n`;
+
+        for (const item of queueItems) {
+          section += `${this.formatItemBlockHtml(item, itemIndex)}\n\n`;
+          itemIndex++;
+        }
+
+        sections.push(section.trimEnd());
+      }
+
+      return sections;
+    }
+
+    return [items.map((item, index) => this.formatItemBlockHtml(item, index)).join('\n\n')];
+  }
+
+  buildTelegramMessages(notification) {
+    const { title, message, priority = 'default', url, items = [] } = notification;
+    const notificationTitle = title || 'Amazon Vine Notification';
+    const notificationMessage = message || 'New items detected';
+    const notificationUrl = url || window.location?.href || '';
+
+    const priorityEmoji = {
+      min: '🔵',
+      low: '🟢',
+      default: '🟡',
+      high: '🟠',
+      urgent: '🔴'
+    };
+    const emoji = priorityEmoji[priority] || '🟡';
+    const header = `${emoji} <b>${TelegramNotificationProvider.escapeHtml(notificationTitle)}</b>`;
+
+    const itemSections = this.buildItemSectionsHtml(notification);
+    if (itemSections.length === 0) {
+      return [{
+        text: `${header}\n\n${TelegramNotificationProvider.escapeHtml(notificationMessage)}`,
+        url: notificationUrl
+      }];
+    }
+
+    const summaryEnd = notificationMessage.indexOf('\n\n');
+    const summary = summaryEnd >= 0 ? notificationMessage.slice(0, summaryEnd) : '';
+    const summaryHtml = summary
+      ? `${TelegramNotificationProvider.escapeHtml(summary)}\n\n`
+      : '';
+    const messages = [];
+    const reserveLength = 120;
+    let currentText = `${header}\n\n${summaryHtml}`;
+    let partNumber = 1;
+
+    const pushCurrentMessage = () => {
+      if (currentText.trim()) {
+        messages.push({ text: currentText.trimEnd(), url: notificationUrl, partNumber });
+        partNumber++;
+      }
+      currentText = partNumber > 1 ? `${header} <i>(continued)</i>\n\n` : `${header}\n\n${summaryHtml}`;
+    };
+
+    for (const section of itemSections) {
+      const sectionWithSpacing = `${section}\n\n`;
+      if ((currentText + sectionWithSpacing).length > this.maxMessageLength - reserveLength) {
+        const initialText = `${header}\n\n${summaryHtml}`.trim();
+        const continuedHeader = `${header} <i>(continued)</i>\n\n`;
+        if (currentText.trim() !== initialText && currentText.trim() !== continuedHeader.trim()) {
+          pushCurrentMessage();
+        }
+
+        if (section.length > this.maxMessageLength - reserveLength) {
+          const blocks = section.split('\n\n');
+          for (const block of blocks) {
+            const blockWithSpacing = `${block}\n\n`;
+            if ((currentText + blockWithSpacing).length > this.maxMessageLength - reserveLength) {
+              pushCurrentMessage();
+            }
+            currentText += blockWithSpacing;
+          }
+        } else {
+          currentText += sectionWithSpacing;
+        }
+      } else {
+        currentText += sectionWithSpacing;
+      }
+    }
+
+    pushCurrentMessage();
+
+    if (messages.length > 1) {
+      const totalParts = messages.length;
+      messages.forEach((entry, index) => {
+        entry.text = `${entry.text}\n\n<i>Part ${index + 1}/${totalParts}</i>`;
+      });
+    }
+
+    return messages;
+  }
+
+  async postTelegramMessage(text, notificationUrl) {
+    const telegramUrl = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
+    const payload = {
+      chat_id: this.chatId,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+      reply_markup: notificationUrl ? {
+        inline_keyboard: [[
+          {
+            text: '🔗 Open Vine',
+            url: notificationUrl
+          }
+        ]]
+      } : undefined
+    };
+
+    const response = await fetch(telegramUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Telegram API error:', errorData);
+      throw new Error(`Telegram API error: ${errorData.description || response.statusText}`);
+    }
+
+    return response.json();
   }
 
   async send(notification) {
@@ -136,8 +246,7 @@ class TelegramNotificationProvider extends NotificationProvider {
         throw new Error('Telegram bot token and chat ID are required');
       }
 
-      const { title, message, priority = 'default', tags = [], url } = notification;
-
+      const { title, message, url } = notification;
       const notificationTitle = title || 'Amazon Vine Notification';
       const notificationMessage = message || 'New items detected';
       const notificationUrl = url || window.location.href;
@@ -145,60 +254,17 @@ class TelegramNotificationProvider extends NotificationProvider {
       console.log('=== TelegramProvider: Preparing to send notification ===');
       console.log('Chat ID:', this.chatId);
       console.log('Title:', notificationTitle);
-      console.log('Message:', notificationMessage);
+      console.log('Message length:', notificationMessage.length);
+      console.log('Items:', notification.items?.length || 0);
       console.log('URL:', notificationUrl);
 
-      // Add priority indicator emoji
-      const priorityEmoji = {
-        'min': '🔵',
-        'low': '🟢',
-        'default': '🟡',
-        'high': '🟠',
-        'urgent': '🔴'
-      };
-      const emoji = priorityEmoji[priority] || '🟡';
+      const messages = this.buildTelegramMessages(notification);
 
-      // Build Telegram message with Markdown formatting
-      // Use bold for title, regular for message
-      let text = `${emoji} *${notificationTitle}*\n\n${notificationMessage}`;
-
-      const telegramUrl = `https://api.telegram.org/bot${this.botToken}/sendMessage`;
-
-      const payload = {
-        chat_id: this.chatId,
-        text: text,
-        parse_mode: 'Markdown',
-        disable_web_page_preview: false,
-        reply_markup: notificationUrl ? {
-          inline_keyboard: [[
-            {
-              text: '🔗 Open Vine',
-              url: notificationUrl
-            }
-          ]]
-        } : undefined
-      };
-
-      console.log('Payload:', JSON.stringify(payload, null, 2));
-
-      const response = await fetch(telegramUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      console.log('Response status:', response.status, response.statusText);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Telegram API error:', errorData);
-        throw new Error(`Telegram API error: ${errorData.description || response.statusText}`);
+      for (const entry of messages) {
+        console.log('Sending Telegram part:', entry.partNumber || 1, 'length:', entry.text.length);
+        await this.postTelegramMessage(entry.text, entry.url || notificationUrl);
       }
 
-      const responseData = await response.json();
-      console.log('Response data:', responseData);
       console.log('✅ TelegramProvider: Notification sent successfully!');
       console.log('=== End notification send ===');
 
@@ -267,11 +333,6 @@ class NotificationProviderManager extends BaseManager {
     const telegramConfig = await this.loadTelegramConfig();
 
     // Register available providers
-    this.registerProvider('ntfy', new NtfyNotificationProvider({
-      topic: 'vine-rugg-potluck',
-      server: 'https://ntfy.sh'
-    }));
-
     this.registerProvider('telegram', new TelegramNotificationProvider({
       botToken: telegramConfig.botToken,
       chatId: telegramConfig.chatId

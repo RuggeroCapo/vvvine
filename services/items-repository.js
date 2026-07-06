@@ -188,6 +188,24 @@ class ItemsRepository {
   }
 
   /**
+   * Store autopick scoring/decision audit data on an item
+   */
+  async setAutopick(asin, autopickData) {
+    const doc = this.get(asin);
+    if (!doc) {
+      console.warn(`ItemsRepository: Item ${asin} not found for setAutopick`);
+      return null;
+    }
+
+    return this.update(asin, {
+      autopick: {
+        ...autopickData,
+        at: autopickData.at || Date.now()
+      }
+    });
+  }
+
+  /**
    * Mark multiple items as unseen (not currently on platform)
    */
   async markAsUnseen(asins) {

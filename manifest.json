@@ -21,7 +21,8 @@
     "*://*.amazon.ca/*",
     "*://*.amazon.com.au/*",
     "*://*.amazon.co.jp/*",
-    "*://api.v-helper.com/*"
+    "*://ita-vine-stats.duckdns.org/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -49,6 +50,7 @@
         "*://www.amazon.co.jp/hz/vine/*"
       ],
       "js": [
+        "debug/flow-inspector.js",
         "services/items-repository.js",
         "managers/base-manager.js",
         "managers/storage-manager.js",
@@ -62,6 +64,7 @@
         "managers/category-tracker-manager.js",
         "managers/notification-provider-manager.js",
         "managers/monitoring-manager.js",
+        "managers/autopick-manager.js",
         "managers/keyboard-manager.js",
         "managers/page-manager.js",
         "content.js"
@@ -91,6 +94,7 @@
         "*://www.amazon.co.jp/gp/buy/thankyou/*"
       ],
       "js": [
+        "debug/flow-inspector.js",
         "checkout-automation.js"
       ],
       "all_frames": true,
@@ -104,5 +108,21 @@
   "action": {
     "default_popup": "popup.html",
     "default_title": "Amazon Vine Efficiency Enhancer"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["debug/flow-inspector-page-bridge.js", "rules.json"],
+      "matches": [
+        "*://www.amazon.com/*",
+        "*://www.amazon.co.uk/*",
+        "*://www.amazon.de/*",
+        "*://www.amazon.fr/*",
+        "*://www.amazon.es/*",
+        "*://www.amazon.it/*",
+        "*://www.amazon.ca/*",
+        "*://www.amazon.com.au/*",
+        "*://www.amazon.co.jp/*"
+      ]
+    }
+  ]
 } 

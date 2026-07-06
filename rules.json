@@ -1,0 +1,638 @@
+{
+  "version": 1,
+  "meta": {
+    "profile": "ruggero-wishlist",
+    "description": "Affinity rules derived from Ruggero's Amazon wishlist (Lista dei desideri). Strong signals: 3D printing, smart home (Matter/HomeKit), premium tech (drones, AR, audio), networking, maker tools, LEGO Icons, home furniture/decor, kitchenware, wearables.",
+    "source": "amazon-wishlist-Lista dei desideri di Ruggero-1782144204356.json",
+    "generatedAt": "2026-06-22"
+  },
+  "rules": [
+    {
+      "type": "keyword",
+      "pattern": "filament",
+      "score": 10,
+      "label": "3D printing",
+      "mustPick": true,
+      "requiresAny": [
+        "pla",
+        "petg",
+        "abs",
+        "tpu",
+        "1.75mm",
+        "1.75 mm",
+        "3d print",
+        "stampa 3d",
+        "3d printer",
+        "stampante 3d",
+        "spool",
+        "bobina"
+      ],
+      "exclude": [
+        "light bulb",
+        "lampadina",
+        "led filament bulb",
+        "lampadina a filamento led"
+      ]
+    },
+    {
+      "type": "keyword",
+      "pattern": "filamento",
+      "score": 10,
+      "label": "3D printing",
+      "mustPick": true,
+      "requiresAny": [
+        "pla",
+        "petg",
+        "abs",
+        "tpu",
+        "1.75mm",
+        "1.75 mm",
+        "3d print",
+        "stampa 3d",
+        "3d printer",
+        "stampante 3d",
+        "spool",
+        "bobina"
+      ],
+      "exclude": [
+        "lampadina",
+        "light bulb"
+      ]
+    },
+    {
+      "type": "keyword",
+      "pattern": "resin",
+      "score": 9,
+      "label": "3D printing",
+      "mustPick": false,
+      "requiresAny": [
+        "sla",
+        "msla",
+        "dlp",
+        "3d print",
+        "stampa 3d",
+        "3d printer",
+        "stampante 3d",
+        "uv resin",
+        "resina uv",
+        "curing",
+        "polimerizzazione"
+      ],
+      "exclude": [
+        "epoxy craft",
+        "creazioni in resina",
+        "resin art kit",
+        "kit arte resina",
+        "resin mold",
+        "stampo in resina",
+        "garden statue",
+        "statua da giardino",
+        "resin jewelry",
+        "gioielli in resina"
+      ]
+    },
+    {
+      "type": "phrase",
+      "pattern": "stampante 3d",
+      "score": 10,
+      "label": "3D printing"
+    },
+    {
+      "type": "phrase",
+      "pattern": "3d printer",
+      "score": 10,
+      "label": "3D printing"
+    },
+    {
+      "type": "brand",
+      "pattern": "Anycubic",
+      "score": 10,
+      "label": "3D printing",
+      "aliases": [
+        "ANY CUBIC"
+      ],
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "custodia per",
+        "case for",
+        "case per",
+        "cover for",
+        "cover per",
+        "sticker",
+        "adesivo",
+        "decal",
+        "decalcomania"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Creality",
+      "score": 10,
+      "label": "3D printing",
+      "aliases": [
+        "SPARKX"
+      ],
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "custodia per",
+        "case for",
+        "case per",
+        "cover for",
+        "cover per",
+        "sticker",
+        "adesivo",
+        "decal",
+        "decalcomania"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Bambu",
+      "score": 9,
+      "label": "3D printing",
+      "aliases": [
+        "Bambu Lab"
+      ],
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "custodia per",
+        "case for",
+        "case per",
+        "cover for",
+        "cover per",
+        "sticker",
+        "adesivo",
+        "decal",
+        "decalcomania"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Prusa",
+      "score": 9,
+      "label": "3D printing",
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "custodia per",
+        "case for",
+        "case per",
+        "cover for",
+        "cover per"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Elegoo",
+      "score": 8,
+      "label": "3D printing",
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "custodia per",
+        "case for",
+        "case per",
+        "cover for",
+        "cover per"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "DJI",
+      "score": 10,
+      "label": "drones",
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "custodia per",
+        "case for",
+        "case per",
+        "cover for",
+        "cover per",
+        "screen protector",
+        "pellicola protettiva",
+        "salvaschermo",
+        "sticker",
+        "adesivo",
+        "decal",
+        "decalcomania"
+      ]
+    },
+    {
+      "type": "keyword",
+      "pattern": "drone",
+      "score": 9,
+      "label": "drones"
+    },
+    {
+      "type": "brand",
+      "pattern": "XREAL",
+      "score": 10,
+      "label": "AR/VR",
+      "aliases": [
+        "Nreal"
+      ],
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "custodia per",
+        "case for",
+        "case per",
+        "cover for",
+        "cover per"
+      ]
+    },
+    {
+      "type": "phrase",
+      "pattern": "ar occhiali",
+      "score": 9,
+      "label": "AR/VR"
+    },
+    {
+      "type": "phrase",
+      "pattern": "ar glasses",
+      "score": 9,
+      "label": "AR/VR"
+    },
+    {
+      "type": "brand",
+      "pattern": "Sonos",
+      "score": 10,
+      "label": "audio",
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "case for",
+        "case per",
+        "custodia per",
+        "cover for",
+        "cover per",
+        "wall mount for",
+        "supporto a parete per",
+        "supporto da muro per",
+        "stand for",
+        "supporto per",
+        "stativo per"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Razer",
+      "score": 8,
+      "label": "audio"
+    },
+    {
+      "type": "brand",
+      "pattern": "TP-Link",
+      "score": 9,
+      "label": "networking",
+      "aliases": [
+        "TPLink",
+        "TP Link"
+      ],
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "case for",
+        "case per",
+        "custodia per",
+        "cover for",
+        "cover per"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Ubiquiti",
+      "score": 8,
+      "label": "networking",
+      "aliases": [
+        "UniFi"
+      ],
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "case for",
+        "case per",
+        "custodia per",
+        "cover for",
+        "cover per"
+      ]
+    },
+    {
+      "type": "phrase",
+      "pattern": "wi-fi 6",
+      "score": 8,
+      "label": "networking"
+    },
+    {
+      "type": "phrase",
+      "pattern": "wifi 6",
+      "score": 8,
+      "label": "networking"
+    },
+    {
+      "type": "keyword",
+      "pattern": "router",
+      "score": 7,
+      "label": "networking"
+    },
+    {
+      "type": "keyword",
+      "pattern": "mesh",
+      "score": 7,
+      "label": "networking"
+    },
+    {
+      "type": "brand",
+      "pattern": "SwitchBot",
+      "score": 9,
+      "label": "smart home",
+      "aliases": [
+        "Switch Bot"
+      ],
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "case for",
+        "case per",
+        "custodia per",
+        "cover for",
+        "cover per"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Aqara",
+      "score": 8,
+      "label": "smart home",
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "case for",
+        "case per",
+        "custodia per",
+        "cover for",
+        "cover per"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Shelly",
+      "score": 8,
+      "label": "smart home",
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "case for",
+        "case per",
+        "custodia per",
+        "cover for",
+        "cover per"
+      ]
+    },
+    {
+      "type": "keyword",
+      "pattern": "HomeKit",
+      "score": 8,
+      "label": "smart home"
+    },
+    {
+      "type": "keyword",
+      "pattern": "Matter",
+      "score": 8,
+      "label": "smart home"
+    },
+    {
+      "type": "phrase",
+      "pattern": "smart home",
+      "score": 7,
+      "label": "smart home"
+    },
+    {
+      "type": "brand",
+      "pattern": "Tineco",
+      "score": 9,
+      "label": "home appliances"
+    },
+    {
+      "type": "phrase",
+      "pattern": "aspirapolvere",
+      "score": 7,
+      "label": "home appliances"
+    },
+    {
+      "type": "brand",
+      "pattern": "LG",
+      "score": 8,
+      "label": "monitors",
+      "requiresAny": [
+        "monitor",
+        "display",
+        "schermo",
+        "4k",
+        "qhd",
+        "curved",
+        "curvo",
+        "ips",
+        "oled",
+        "ultrawide"
+      ],
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "case for",
+        "case per",
+        "custodia per",
+        "cover for",
+        "cover per"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Dell",
+      "score": 7,
+      "label": "monitors",
+      "aliases": [
+        "Alienware"
+      ],
+      "requiresAny": [
+        "monitor",
+        "display",
+        "schermo",
+        "4k",
+        "qhd",
+        "curved",
+        "curvo",
+        "ips",
+        "oled",
+        "ultrawide"
+      ],
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "case for",
+        "case per",
+        "custodia per",
+        "cover for",
+        "cover per"
+      ]
+    },
+    {
+      "type": "keyword",
+      "pattern": "monitor",
+      "score": 7,
+      "label": "monitors",
+      "exclude": [
+        "baby monitor",
+        "monitor per neonati",
+        "ascoltabimbi",
+        "video baby",
+        "pet monitor",
+        "telecamera per animali",
+        "heart rate monitor",
+        "cardiofrequenzimetro",
+        "monitoraggio bambini"
+      ]
+    },
+    {
+      "type": "keyword",
+      "pattern": "4K",
+      "score": 7,
+      "label": "monitors"
+    },
+    {
+      "type": "brand",
+      "pattern": "LEGO",
+      "score": 9,
+      "label": "collectibles"
+    },
+    {
+      "type": "brand",
+      "pattern": "Withings",
+      "score": 9,
+      "label": "wearables",
+      "exclude": [
+        "compatible with",
+        "compatibile con",
+        "case for",
+        "case per",
+        "custodia per",
+        "cover for",
+        "cover per",
+        "band for",
+        "cinturino per",
+        "strap for",
+        "cinghia per"
+      ]
+    },
+    {
+      "type": "phrase",
+      "pattern": "scanwatch",
+      "score": 9,
+      "label": "wearables"
+    },
+    {
+      "type": "keyword",
+      "pattern": "smartwatch",
+      "score": 7,
+      "label": "wearables"
+    },
+    {
+      "type": "brand",
+      "pattern": "Wowstick",
+      "score": 9,
+      "label": "maker tools"
+    },
+    {
+      "type": "brand",
+      "pattern": "iFixit",
+      "score": 8,
+      "label": "maker tools"
+    },
+    {
+      "type": "brand",
+      "pattern": "Swiss Tech",
+      "score": 7,
+      "label": "maker tools",
+      "aliases": [
+        "Swiss+Tech",
+        "SwissTech"
+      ]
+    },
+    {
+      "type": "phrase",
+      "pattern": "cacciavite di precisione",
+      "score": 8,
+      "label": "maker tools"
+    },
+    {
+      "type": "phrase",
+      "pattern": "precision screwdriver",
+      "score": 8,
+      "label": "maker tools"
+    },
+    {
+      "type": "phrase",
+      "pattern": "electric screwdriver",
+      "score": 8,
+      "label": "maker tools"
+    },
+    {
+      "type": "phrase",
+      "pattern": "cacciavite elettrico",
+      "score": 8,
+      "label": "maker tools"
+    },
+    {
+      "type": "keyword",
+      "pattern": "multitool",
+      "score": 7,
+      "label": "maker tools"
+    },
+    {
+      "type": "brand",
+      "pattern": "Incapto",
+      "score": 8,
+      "label": "kitchenware"
+    },
+    {
+      "type": "phrase",
+      "pattern": "coffee container",
+      "score": 8,
+      "label": "kitchenware"
+    },
+    {
+      "type": "phrase",
+      "pattern": "contenitore per caffè",
+      "score": 8,
+      "label": "kitchenware"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\b(ssd|nvme|m\\.2)\\b",
+      "score": 8,
+      "label": "storage"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\b(fdm|sla|msla|dlp)\\b",
+      "score": 8,
+      "label": "3D printing"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\b(wi-?fi\\s*6e?|ax\\d{3,4})\\b",
+      "score": 8,
+      "label": "networking"
+    },
+    {
+      "type": "regex",
+      "pattern": "\\b(nozzle|ugello|hotend|extruder|estrusore|build plate|piatto di stampa|pebuild)\\b",
+      "score": 9,
+      "label": "3D printing"
+    }
+  ]
+}
