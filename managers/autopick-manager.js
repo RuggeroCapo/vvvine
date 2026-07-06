@@ -781,6 +781,51 @@ class AutopickManager extends BaseManager {
     }
   }
 
+  // Fast rule-only score for notifications (no LLM, no value fetch).
+  getQuickNotificationScore(item) {
+    if (!this.rulesLoaded || !item?.title) {
+      return null;
+    }
+
+    const matches = this.matchAllRules(item.title);
+    const rule = this.selectBestRule(matches);
+    if (!rule) {
+      return null;
+    }
+
+    const queueScore = this.scoreQueue(item.queue);
+    const valueScore = this.config.unknownValueScore;
+    let affinityScore;
+    let override = false;
+
+    if (rule.mustPick) {
+      affinityScore = 10;
+      override = true;
+    } else {
+      const base = this.clamp(this.weightedRuleScore(rule), 0, 10);
+      const distinctLabels = new Set(matches.map((m) => m.label || m.pattern)).size;
+      const stackBonus = Math.max(0, distinctLabels - 1) * (this.config.stackBonusPerLabel || 0);
+      affinityScore = this.clamp(base + stackBonus, 0, 10);
+    }
+
+    const confidence = override
+      ? this.config.mustPickConfidenceFloor
+      : this.computeConfidence(affinityScore, valueScore, queueScore);
+
+    return {
+      scored: true,
+      affinityScore,
+      confidence,
+      affinitySource: 'rule',
+      rule: {
+        type: rule.type,
+        pattern: rule.pattern,
+        label: rule.label,
+        mustPick: Boolean(rule.mustPick)
+      }
+    };
+  }
+
   getScoreClass(confidence) {
     if (confidence >= 90) {
       return 'vine-autopick-high';

@@ -4,6 +4,7 @@ class UIManager extends BaseManager {
     super(config);
     this.controlPanel = null;
     this.currentPage = this.getCurrentPageNumber();
+    this.lastPollHealth = {};
   }
 
   async setup() {
@@ -110,6 +111,7 @@ class UIManager extends BaseManager {
               <button class="vine-monitoring-mode-btn" data-monitoring-mode="live">Live</button>
             </div>
             <span id="monitoring-live-state" class="vine-monitoring-live-state vine-monitoring-live-idle">Idle</span>
+            <span id="monitoring-poll-health" class="vine-monitoring-live-state vine-monitoring-live-idle" style="display: none;">Idle</span>
           </div>
           <div id="monitoring-refresh-section" class="vine-monitoring-section">
             <span class="vine-monitoring-label">Refresh:</span>
@@ -368,6 +370,11 @@ class UIManager extends BaseManager {
       this.updateLiveState(data?.state, data);
     });
 
+    this.on('monitoringHealthChanged', (health) => {
+      this.lastPollHealth = health || {};
+      this.updatePollHealthState(this.lastPollHealth);
+    });
+
     // Sync UI with persisted monitoring state (handles case where
     // MonitoringManager emitted the event before UIManager was ready)
     const monitoringEnabled = sessionStorage.getItem('vineMonitoringEnabled') === 'true';
@@ -581,9 +588,53 @@ class UIManager extends BaseManager {
       liveSection.style.display = normalizedMode === 'live' ? 'flex' : 'none';
     }
 
-    if (updateState) {
-      this.updateLiveState(normalizedMode === 'live' ? 'idle' : 'hidden');
+    const liveStateEl = document.getElementById('monitoring-live-state');
+    const pollHealthEl = document.getElementById('monitoring-poll-health');
+    if (liveStateEl) {
+      liveStateEl.style.display = normalizedMode === 'live' ? '' : 'none';
     }
+    if (pollHealthEl) {
+      pollHealthEl.style.display = normalizedMode === 'live' ? 'none' : '';
+    }
+
+    if (updateState) {
+      if (normalizedMode === 'live') {
+        this.updateLiveState('idle');
+      } else {
+        this.updatePollHealthState(this.lastPollHealth || {});
+      }
+    }
+  }
+
+  updatePollHealthState(health = {}) {
+    const pollHealth = document.getElementById('monitoring-poll-health');
+    if (!pollHealth) return;
+
+    const { isChecking, consecutiveFailures = 0, lastFailureReason, lastSuccessTime, lastCheckTime } = health;
+
+    let state = 'idle';
+    let label = 'Idle';
+
+    if (isChecking) {
+      state = 'connecting';
+      label = 'Checking…';
+    } else if (consecutiveFailures > 0) {
+      state = lastFailureReason === 'session-expired' ? 'error' : 'reconnecting';
+      label = lastFailureReason === 'session-expired' ? 'Signed out' : `Failing (${consecutiveFailures})`;
+    } else if (lastSuccessTime) {
+      state = 'connected';
+      label = 'OK';
+    }
+
+    pollHealth.textContent = label;
+    pollHealth.className = 'vine-monitoring-live-state';
+    pollHealth.classList.add(`vine-monitoring-live-${state}`);
+
+    const titleParts = [];
+    if (lastCheckTime) titleParts.push(`Last check: ${new Date(lastCheckTime).toLocaleTimeString()}`);
+    if (lastSuccessTime) titleParts.push(`Last success: ${new Date(lastSuccessTime).toLocaleTimeString()}`);
+    if (lastFailureReason) titleParts.push(`Last failure: ${lastFailureReason}`);
+    pollHealth.title = titleParts.length ? titleParts.join(' | ') : 'No checks yet';
   }
 
   updateLiveState(state, data = {}) {

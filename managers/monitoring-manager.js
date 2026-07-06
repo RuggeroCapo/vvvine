@@ -19,6 +19,17 @@ class MonitoringManager extends BaseManager {
     this.eventSource = null;
     this.liveReconnectTimer = null;
 
+    // Polling health/reliability state
+    this.isChecking = false;
+    this.lastCheckTime = null;
+    this.lastSuccessTime = null;
+    this.consecutiveFailures = 0;
+    this.lastFailureReason = null;
+    this.sessionExpiredAlerted = false;
+    this.fetchTimeoutMs = 20000;
+    this.maxConsecutiveFailuresBeforeAlert = 3;
+    this.maxBackoffMs = 30 * 60 * 1000; // never back off past 30 minutes
+
     // Configuration
     this.config = {
       queues: ['potluck', 'encore', 'last_chance'],  // Which queues to monitor
@@ -75,6 +86,7 @@ class MonitoringManager extends BaseManager {
       console.log('Repository Initialized:', this.repository?.isInitialized);
       console.log('Event Listeners:', window.vineEventBus?.events.has('startMonitoring') ?
         `${window.vineEventBus.events.get('startMonitoring').length} listener(s)` : 'None');
+      console.log('Health:', this.getHealth());
       console.log('===================================');
       return {
         isMonitoring: this.isMonitoring,
@@ -82,7 +94,8 @@ class MonitoringManager extends BaseManager {
         hasNotificationProvider: !!this.notificationProvider,
         hasNewItemsManager: !!this.newItemsManager,
         hasTimer: !!this.monitoringTimer,
-        repositoryInitialized: this.repository?.isInitialized
+        repositoryInitialized: this.repository?.isInitialized,
+        health: this.getHealth()
       };
     };
 
@@ -220,6 +233,13 @@ class MonitoringManager extends BaseManager {
 
     console.log('[MonitoringManager] All dependencies validated, starting monitoring...');
     this.isMonitoring = true;
+    // Reset health/failure tracking from any previous monitoring session
+    this.consecutiveFailures = 0;
+    this.lastFailureReason = null;
+    this.sessionExpiredAlerted = false;
+    this.lastCheckTime = null;
+    this.lastSuccessTime = null;
+    this.emitHealthChanged();
     // Use sessionStorage for per-tab independent monitoring state
     sessionStorage.setItem('vineMonitoringEnabled', 'true');
     console.log('[MonitoringManager] Emitting monitoringStateChanged event');
@@ -281,6 +301,7 @@ class MonitoringManager extends BaseManager {
     console.log('[MonitoringManager] Stopping monitoring timer...');
     this.stopMonitoringTimer();
     this.disconnectLive();
+    this.emitHealthChanged();
 
     console.log('[MonitoringManager] Monitoring stopped successfully');
   }
@@ -288,26 +309,53 @@ class MonitoringManager extends BaseManager {
   startMonitoringTimer() {
     // Clear any existing timer
     this.stopMonitoringTimer();
-
-    // Add ±10% random variation to interval
-    const baseMs = this.config.refreshIntervalSeconds * 1000;
-    const variation = 0.1;
-    const randomizedMs = baseMs * (1 + (Math.random() * 2 - 1) * variation);
-
-    console.log(`[MonitoringManager] Starting timer: ${Math.round(randomizedMs / 1000)}s (base: ${this.config.refreshIntervalSeconds}s)`);
-
-    this.monitoringTimer = setInterval(() => {
-      console.log('[MonitoringManager] Timer triggered, checking all queues...');
-      this.checkAllQueues();
-    }, randomizedMs);
+    this.scheduleNextCheck();
   }
 
   stopMonitoringTimer() {
     if (this.monitoringTimer) {
-      clearInterval(this.monitoringTimer);
+      clearTimeout(this.monitoringTimer);
       this.monitoringTimer = null;
       console.log('[MonitoringManager] Timer stopped');
     }
+  }
+
+  // Compute the delay before the next scheduled check. Applies ±10% jitter
+  // plus exponential backoff (capped) while checks keep failing, so a flaky
+  // network or a rate-limited/blocked session doesn't get hammered every
+  // few minutes.
+  computeNextDelayMs() {
+    const baseMs = this.config.refreshIntervalSeconds * 1000;
+    const variation = 0.1;
+    const jitter = 1 + (Math.random() * 2 - 1) * variation;
+
+    const backoffSteps = Math.min(this.consecutiveFailures, 5);
+    const backoffMultiplier = backoffSteps > 0 ? Math.pow(2, backoffSteps) : 1;
+
+    return Math.min(baseMs * jitter * backoffMultiplier, this.maxBackoffMs);
+  }
+
+  // Self-rescheduling timer: the next check is only scheduled once the
+  // current one fully resolves, so slow/hung checks can never overlap with
+  // the next tick (unlike a plain setInterval).
+  scheduleNextCheck() {
+    if (!this.isMonitoring || this.isLiveMode()) {
+      return;
+    }
+
+    const delayMs = this.computeNextDelayMs();
+    console.log(`[MonitoringManager] Next check in ${Math.round(delayMs / 1000)}s (consecutive failures: ${this.consecutiveFailures})`);
+
+    this.monitoringTimer = setTimeout(async () => {
+      this.monitoringTimer = null;
+      try {
+        await this.checkAllQueues();
+      } catch (error) {
+        console.error('[MonitoringManager] Unhandled error during scheduled check:', error);
+      } finally {
+        this.scheduleNextCheck();
+      }
+    }, delayMs);
   }
 
   isLiveMode() {
@@ -333,52 +381,163 @@ class MonitoringManager extends BaseManager {
       return;
     }
 
-    console.log('[MonitoringManager] ========== checkAllQueues START ==========');
-    console.log('[MonitoringManager] Queues to check:', this.config.queues);
-
-    const queuesChecked = [];
-
-    // Check all queues in parallel for speed
-    const checkPromises = this.config.queues.map(async (queue) => {
-      try {
-        const queueUrl = this.getQueueUrlForQueue(queue);
-        if (!queueUrl) {
-          console.warn(`[MonitoringManager] No URL for queue ${queue}, skipping`);
-          return { queue, items: [], error: null };
-        }
-
-        console.log(`[MonitoringManager] Fetching ${queue}: ${queueUrl}`);
-        const html = await this.fetchQueueHtml(queueUrl);
-        const items = this.parseItemsFromHtml(html, queue);
-        console.log(`[MonitoringManager] Parsed ${items.length} items from ${queue}`);
-
-        return { queue, items, error: null };
-      } catch (error) {
-        console.error(`[MonitoringManager] Error checking queue ${queue}:`, error);
-        return { queue, items: [], error };
-      }
-    });
-
-    const results = await Promise.all(checkPromises);
-
-    const discoveredItems = [];
-
-    // Process results and find new items
-    for (const result of results) {
-      if (result.error) continue;
-
-      queuesChecked.push(result.queue);
-      discoveredItems.push(...result.items.map(item => ({ ...item, queue: result.queue })));
+    if (this.isChecking) {
+      console.log('[MonitoringManager] Check already in progress, skipping this cycle');
+      return;
     }
 
-    const { newItems } = await this.processDetectedItems(discoveredItems, queuesChecked);
+    this.isChecking = true;
+    this.lastCheckTime = Date.now();
+    this.emitHealthChanged();
 
-    console.log('[MonitoringManager] Total new items found:', newItems.length);
-    console.log('[MonitoringManager] Queues checked:', queuesChecked);
+    try {
+      console.log('[MonitoringManager] ========== checkAllQueues START ==========');
+      console.log('[MonitoringManager] Queues to check:', this.config.queues);
 
-    console.log('[MonitoringManager] ========== checkAllQueues END ==========');
+      const queuesChecked = [];
 
-    return { newItems, queuesChecked };
+      // Check all queues in parallel for speed
+      const checkPromises = this.config.queues.map(async (queue) => {
+        try {
+          const queueUrl = this.getQueueUrlForQueue(queue);
+          if (!queueUrl) {
+            console.warn(`[MonitoringManager] No URL for queue ${queue}, skipping`);
+            return { queue, items: [], error: null, sessionExpired: false };
+          }
+
+          console.log(`[MonitoringManager] Fetching ${queue}: ${queueUrl}`);
+          const html = await this.fetchQueueHtml(queueUrl);
+
+          if (this.isSignedOutHtml(html)) {
+            console.warn(`[MonitoringManager] Signed-out page detected while checking ${queue}`);
+            return { queue, items: [], error: null, sessionExpired: true };
+          }
+
+          const items = this.parseItemsFromHtml(html, queue);
+          console.log(`[MonitoringManager] Parsed ${items.length} items from ${queue}`);
+
+          return { queue, items, error: null, sessionExpired: false };
+        } catch (error) {
+          console.error(`[MonitoringManager] Error checking queue ${queue}:`, error);
+          return { queue, items: [], error, sessionExpired: false };
+        }
+      });
+
+      const results = await Promise.all(checkPromises);
+
+      const discoveredItems = [];
+
+      // Process results and find new items
+      for (const result of results) {
+        if (result.error || result.sessionExpired) continue;
+
+        queuesChecked.push(result.queue);
+        discoveredItems.push(...result.items.map(item => ({ ...item, queue: result.queue })));
+      }
+
+      const { newItems } = await this.processDetectedItems(discoveredItems, queuesChecked);
+
+      console.log('[MonitoringManager] Total new items found:', newItems.length);
+      console.log('[MonitoringManager] Queues checked:', queuesChecked);
+
+      const sessionExpired = results.some(result => result.sessionExpired);
+      const erroredResults = results.filter(result => result.error);
+      const attemptedQueues = this.config.queues.filter(queue => this.getQueueUrlForQueue(queue));
+
+      if (sessionExpired) {
+        await this.handleSessionExpired();
+      } else if (attemptedQueues.length > 0 && erroredResults.length === attemptedQueues.length) {
+        await this.handleCheckFailure(erroredResults[0]?.error);
+      } else {
+        this.handleCheckSuccess();
+      }
+
+      console.log('[MonitoringManager] ========== checkAllQueues END ==========');
+
+      return { newItems, queuesChecked };
+    } finally {
+      this.isChecking = false;
+      this.emitHealthChanged();
+    }
+  }
+
+  // Detects Amazon's sign-in page so an expired/logged-out session isn't
+  // silently mistaken for "queue has no items".
+  isSignedOutHtml(html) {
+    if (!html) {
+      return false;
+    }
+    return /id=["']ap_email["']|id=["']signInSubmit["']|authportal-main-section/i.test(html);
+  }
+
+  async handleSessionExpired() {
+    this.consecutiveFailures++;
+    this.lastFailureReason = 'session-expired';
+    this.emitHealthChanged();
+
+    if (this.sessionExpiredAlerted) {
+      return;
+    }
+    this.sessionExpiredAlerted = true;
+
+    console.warn('[MonitoringManager] Amazon session appears signed out; monitoring will keep retrying');
+    try {
+      await this.sendNotification({
+        title: 'Vine Monitoring: Session Expired',
+        message: 'Your Amazon session looks signed out, so checks are returning the sign-in page instead of items. Please log back in to resume monitoring.',
+        priority: 'high',
+        tags: ['vine', 'monitoring', 'session-expired']
+      });
+    } catch (error) {
+      console.error('[MonitoringManager] Failed to send session-expired notification:', error);
+    }
+  }
+
+  async handleCheckFailure(error) {
+    this.consecutiveFailures++;
+    this.lastFailureReason = error?.message || 'unknown-error';
+    this.emitHealthChanged();
+
+    if (this.consecutiveFailures !== this.maxConsecutiveFailuresBeforeAlert) {
+      return;
+    }
+
+    console.warn(`[MonitoringManager] ${this.consecutiveFailures} consecutive failed checks (${this.lastFailureReason})`);
+    try {
+      await this.sendNotification({
+        title: 'Vine Monitoring: Checks Failing',
+        message: `${this.consecutiveFailures} checks in a row have failed (${this.lastFailureReason}). Monitoring will keep retrying with backoff.`,
+        priority: 'default',
+        tags: ['vine', 'monitoring', 'error']
+      });
+    } catch (notifyError) {
+      console.error('[MonitoringManager] Failed to send check-failure notification:', notifyError);
+    }
+  }
+
+  handleCheckSuccess() {
+    if (this.consecutiveFailures > 0) {
+      console.log(`[MonitoringManager] Check recovered after ${this.consecutiveFailures} consecutive failure(s)`);
+    }
+    this.consecutiveFailures = 0;
+    this.lastFailureReason = null;
+    this.sessionExpiredAlerted = false;
+    this.lastSuccessTime = Date.now();
+    this.emitHealthChanged();
+  }
+
+  emitHealthChanged() {
+    this.emit('monitoringHealthChanged', this.getHealth());
+  }
+
+  getHealth() {
+    return {
+      isChecking: this.isChecking,
+      lastCheckTime: this.lastCheckTime,
+      lastSuccessTime: this.lastSuccessTime,
+      consecutiveFailures: this.consecutiveFailures,
+      lastFailureReason: this.lastFailureReason
+    };
   }
 
   async processDetectedItems(items, queuesChecked = []) {
@@ -387,6 +546,9 @@ class MonitoringManager extends BaseManager {
     }
 
     const allNewItems = [];
+    // Guards against the same ASIN being queued twice in one cycle (e.g. it
+    // shows up in more than one monitored queue's fetched HTML).
+    const addedAsins = new Set();
     const uniqueQueues = new Set((queuesChecked || []).filter(Boolean));
     let hasRepositoryChanges = false;
 
@@ -417,7 +579,10 @@ class MonitoringManager extends BaseManager {
 
         this.repository.items.set(item.asin, newDoc);
         hasRepositoryChanges = true;
-        allNewItems.push(this.buildAutopickCandidate(newDoc, item, itemQueue));
+        if (!addedAsins.has(item.asin)) {
+          addedAsins.add(item.asin);
+          allNewItems.push(this.buildAutopickCandidate(newDoc, item, itemQueue));
+        }
         continue;
       }
 
@@ -452,7 +617,8 @@ class MonitoringManager extends BaseManager {
         hasRepositoryChanges = true;
       }
 
-      if (!existingDoc.notified && !existingDoc.hidden) {
+      if (!existingDoc.notified && !existingDoc.hidden && !addedAsins.has(item.asin)) {
+        addedAsins.add(item.asin);
         allNewItems.push(this.buildAutopickCandidate(existingDoc, item, itemQueue));
       }
     }
@@ -473,6 +639,7 @@ class MonitoringManager extends BaseManager {
 
     if (allNewItems.length > 0) {
       this.injectNewItemTiles(allNewItems);
+      this.attachNotificationScores(allNewItems);
       await this.notifyAboutNewItemsMultiQueue(allNewItems, Array.from(uniqueQueues));
       this.emit('autopick:candidates', { items: allNewItems });
     }
@@ -526,20 +693,34 @@ class MonitoringManager extends BaseManager {
     return Number.isFinite(value) ? value : null;
   }
 
-  // Fetch HTML from a queue URL
+  // Fetch HTML from a queue URL, aborting after fetchTimeoutMs so a hung
+  // request can't stall the whole check cycle.
   async fetchQueueHtml(url) {
-    const response = await fetch(url, {
-      credentials: 'include', // Include cookies for authentication
-      headers: {
-        'Accept': 'text/html'
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.fetchTimeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        credentials: 'include', // Include cookies for authentication
+        headers: {
+          'Accept': 'text/html'
+        },
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-    });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      return await response.text();
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error(`Request timed out after ${this.fetchTimeoutMs}ms`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    return await response.text();
   }
 
   // Parse items from HTML string using DOMParser
@@ -1181,7 +1362,7 @@ class MonitoringManager extends BaseManager {
           await this.repository.setNotified(doc.asin, true);
         }
 
-        // Send notifications
+        this.attachNotificationScores(newItems);
         await this.notifyAboutNewItems(newItems);
       }
     } catch (error) {
@@ -1258,6 +1439,26 @@ class MonitoringManager extends BaseManager {
   cleanNotificationTitle(title) {
     const cleaned = (title || 'Unknown item').replace(/…+$/g, '').trim();
     return cleaned || 'Unknown item';
+  }
+
+  attachNotificationScores(items) {
+    const autopick = window.vineAutopickManager;
+    if (!autopick || !Array.isArray(items)) {
+      return items;
+    }
+
+    for (const item of items) {
+      if (item.autopick?.affinityScore != null) {
+        continue;
+      }
+
+      const quickScore = autopick.getQuickNotificationScore?.(item);
+      if (quickScore) {
+        item.autopick = { ...item.autopick, ...quickScore };
+      }
+    }
+
+    return items;
   }
 
   getNotificationItemUrl(item) {

@@ -54,9 +54,31 @@ class TelegramNotificationProvider extends NotificationProvider {
     return TelegramNotificationProvider.escapeHtml(text).replace(/"/g, '&quot;');
   }
 
+  static decodeHtmlEntities(text) {
+    if (!text || !/[&][#a-zA-Z0-9]+;/.test(text)) {
+      return text;
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = text;
+    return textarea.value;
+  }
+
   static cleanItemTitle(title) {
-    const cleaned = (title || 'Unknown item').replace(/…+$/g, '').trim();
+    const decoded = TelegramNotificationProvider.decodeHtmlEntities(title || '');
+    const cleaned = decoded.replace(/…+$/g, '').trim();
     return cleaned || 'Unknown item';
+  }
+
+  static getAffinitySourceLabel(source) {
+    switch (source) {
+      case 'rule':
+        return 'rules';
+      case 'llm':
+        return 'AI';
+      default:
+        return '';
+    }
   }
 
   getProductUrl(item) {
@@ -84,17 +106,78 @@ class TelegramNotificationProvider extends NotificationProvider {
     }
   }
 
-  formatItemBlockHtml(item, index) {
-    const asin = TelegramNotificationProvider.escapeHtml(item.asin || '—');
+  getAffinityMeta(item) {
+    const autopick = item?.autopick;
+    if (autopick?.affinityScore != null) {
+      return {
+        affinityScore: autopick.affinityScore,
+        confidence: autopick.confidence,
+        affinitySource: autopick.affinitySource
+      };
+    }
+
+    const quickScore = window.vineAutopickManager?.getQuickNotificationScore?.(item);
+    if (quickScore?.affinityScore != null) {
+      return {
+        affinityScore: quickScore.affinityScore,
+        confidence: quickScore.confidence,
+        affinitySource: quickScore.affinitySource
+      };
+    }
+
+    return null;
+  }
+
+  formatItemMetaLine(item, options = {}) {
+    const { showQueue = true } = options;
+    const metaParts = [];
+
+    if (showQueue) {
+      metaParts.push(TelegramNotificationProvider.escapeHtml(this.getQueueLabel(item.queue)));
+    }
+
+    const affinity = this.getAffinityMeta(item);
+    if (affinity?.affinityScore != null) {
+      const sourceLabel = TelegramNotificationProvider.getAffinitySourceLabel(affinity.affinitySource);
+      const affinityText = sourceLabel
+        ? `Affinity ${affinity.affinityScore}/10 (${sourceLabel})`
+        : `Affinity ${affinity.affinityScore}/10`;
+      metaParts.push(TelegramNotificationProvider.escapeHtml(affinityText));
+    }
+
+    if (affinity?.confidence != null) {
+      metaParts.push(TelegramNotificationProvider.escapeHtml(`${affinity.confidence}% match`));
+    }
+
+    return metaParts.length > 0 ? `<i>${metaParts.join(' · ')}</i>` : '';
+  }
+
+  formatItemBlockHtml(item, options = {}) {
+    const { showQueue = true, index = null, includeTitle = true } = options;
     const title = TelegramNotificationProvider.escapeHtml(
       TelegramNotificationProvider.cleanItemTitle(item.title)
     );
+    const asin = TelegramNotificationProvider.escapeHtml(item.asin || '—');
     const productUrl = this.getProductUrl(item);
-    const link = productUrl
-      ? `\n<a href="${TelegramNotificationProvider.escapeHtmlAttribute(productUrl)}">Open product</a>`
-      : '';
+    const indexPrefix = index != null ? `${index}. ` : '';
+    const metaLine = this.formatItemMetaLine(item, { showQueue });
 
-    return `<b>${index + 1}.</b> <code>${asin}</code>\n${title}${link}`;
+    let block = '';
+    if (includeTitle) {
+      block = `<b>${indexPrefix}${title}</b>`;
+      if (metaLine) {
+        block += `\n${metaLine}`;
+      }
+    } else if (metaLine) {
+      block = metaLine;
+    }
+    block += `\n<code>${asin}</code>`;
+
+    if (productUrl) {
+      block += `\n<a href="${TelegramNotificationProvider.escapeHtmlAttribute(productUrl)}">View on Amazon</a>`;
+    }
+
+    return block;
   }
 
   buildItemSectionsHtml(notification) {
@@ -103,32 +186,66 @@ class TelegramNotificationProvider extends NotificationProvider {
       return [];
     }
 
+    if (items.length === 1) {
+      return [this.formatItemBlockHtml(items[0], { showQueue: true, includeTitle: false })];
+    }
+
     if (itemsByQueue) {
+      const queueKeys = Object.keys(itemsByQueue);
+      const singleQueue = queueKeys.length === 1;
       const sections = [];
       let itemIndex = 0;
 
-      for (const queue of Object.keys(itemsByQueue)) {
+      for (const queue of queueKeys) {
         const queueItems = itemsByQueue[queue];
-        const queueLabel = TelegramNotificationProvider.escapeHtml(this.getQueueLabel(queue));
-        let section = `<b>${queueLabel}</b> (${queueItems.length}):\n`;
+        let section = '';
 
-        for (const item of queueItems) {
-          section += `${this.formatItemBlockHtml(item, itemIndex)}\n\n`;
-          itemIndex++;
+        if (!singleQueue) {
+          const queueLabel = TelegramNotificationProvider.escapeHtml(this.getQueueLabel(queue));
+          section += `<b>${queueLabel}</b> (${queueItems.length})\n`;
         }
 
+        const blocks = queueItems.map((item) => {
+          itemIndex += 1;
+          return this.formatItemBlockHtml(item, {
+            showQueue: singleQueue,
+            index: itemIndex
+          });
+        });
+
+        section += blocks.join('\n\n');
         sections.push(section.trimEnd());
       }
 
       return sections;
     }
 
-    return [items.map((item, index) => this.formatItemBlockHtml(item, index)).join('\n\n')];
+    return [items.map((item, index) => this.formatItemBlockHtml(item, {
+      showQueue: true,
+      index: index + 1
+    })).join('\n\n')];
+  }
+
+  buildNotificationHeader(notification, emoji) {
+    const { items = [], itemsByQueue = null } = notification;
+    const count = items.length;
+
+    if (count === 1) {
+      const title = TelegramNotificationProvider.cleanItemTitle(items[0].title);
+      const headerTitle = title.length > 140 ? `${title.slice(0, 137)}…` : title;
+      return `${emoji} <b>${TelegramNotificationProvider.escapeHtml(headerTitle)}</b>`;
+    }
+
+    const queueKeys = itemsByQueue ? Object.keys(itemsByQueue) : [];
+    const sharedQueue = queueKeys.length === 1
+      ? ` · ${TelegramNotificationProvider.escapeHtml(this.getQueueLabel(queueKeys[0]))}`
+      : '';
+
+    return `${emoji} <b>${count} New Vine Items${sharedQueue}</b>`;
   }
 
   buildTelegramMessages(notification) {
-    const { title, message, priority = 'default', url, items = [] } = notification;
-    const notificationTitle = title || 'Amazon Vine Notification';
+    const { message, priority = 'default', url, items = [] } = notification;
     const notificationMessage = message || 'New items detected';
     const notificationUrl = url || window.location?.href || '';
 
@@ -140,24 +257,20 @@ class TelegramNotificationProvider extends NotificationProvider {
       urgent: '🔴'
     };
     const emoji = priorityEmoji[priority] || '🟡';
-    const header = `${emoji} <b>${TelegramNotificationProvider.escapeHtml(notificationTitle)}</b>`;
 
     const itemSections = this.buildItemSectionsHtml(notification);
     if (itemSections.length === 0) {
+      const fallbackHeader = `${emoji} <b>${TelegramNotificationProvider.escapeHtml(notification.title || 'Amazon Vine Notification')}</b>`;
       return [{
-        text: `${header}\n\n${TelegramNotificationProvider.escapeHtml(notificationMessage)}`,
+        text: `${fallbackHeader}\n\n${TelegramNotificationProvider.escapeHtml(notificationMessage)}`,
         url: notificationUrl
       }];
     }
 
-    const summaryEnd = notificationMessage.indexOf('\n\n');
-    const summary = summaryEnd >= 0 ? notificationMessage.slice(0, summaryEnd) : '';
-    const summaryHtml = summary
-      ? `${TelegramNotificationProvider.escapeHtml(summary)}\n\n`
-      : '';
+    const header = this.buildNotificationHeader(notification, emoji);
     const messages = [];
     const reserveLength = 120;
-    let currentText = `${header}\n\n${summaryHtml}`;
+    let currentText = `${header}\n\n`;
     let partNumber = 1;
 
     const pushCurrentMessage = () => {
@@ -165,13 +278,13 @@ class TelegramNotificationProvider extends NotificationProvider {
         messages.push({ text: currentText.trimEnd(), url: notificationUrl, partNumber });
         partNumber++;
       }
-      currentText = partNumber > 1 ? `${header} <i>(continued)</i>\n\n` : `${header}\n\n${summaryHtml}`;
+      currentText = partNumber > 1 ? `${header} <i>(continued)</i>\n\n` : `${header}\n\n`;
     };
 
     for (const section of itemSections) {
       const sectionWithSpacing = `${section}\n\n`;
       if ((currentText + sectionWithSpacing).length > this.maxMessageLength - reserveLength) {
-        const initialText = `${header}\n\n${summaryHtml}`.trim();
+        const initialText = `${header}\n\n`.trim();
         const continuedHeader = `${header} <i>(continued)</i>\n\n`;
         if (currentText.trim() !== initialText && currentText.trim() !== continuedHeader.trim()) {
           pushCurrentMessage();
