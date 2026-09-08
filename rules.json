@@ -2,11 +2,24 @@
   "version": 1,
   "meta": {
     "profile": "ruggero-wishlist",
-    "description": "Affinity rules derived from Ruggero's Amazon wishlist (Lista dei desideri). Strong signals: 3D printing, smart home (Matter/HomeKit), premium tech (drones, AR, audio), networking, maker tools, LEGO Icons, home furniture/decor, kitchenware, wearables.",
+    "description": "Affinity rules derived from Ruggero's Amazon wishlist and preferred brands. Strong signals: 3D printing, smart home, premium tech (drones, photo/video, audio), PCs & phones, networking, maker tools, LEGO/collectibles, home appliances (robot aspirapolvere, lavapavimenti), kitchenware, wearables.",
     "source": "amazon-wishlist-Lista dei desideri di Ruggero-1782144204356.json",
-    "generatedAt": "2026-06-22"
+    "generatedAt": "2026-07-06",
+    "sharedExclude": "Merged into every rule at compile time — accessory/case/replacement patterns"
   },
   "rules": [
+    {
+      "type": "regex",
+      "pattern": "\\b(cartucc\\w*|(?:ink(?:jet)?\\s+)?cartridges?|(?:laser\\s+)?toner(?:\\s+cartridges?)?|inchiostro(?:\\s+per\\s+stampant\\w*)?|tamburo(?:\\s+stampante)?|drum\\s+unit|fusore|fuser(?:\\s+unit)?|ricarica\\s+inchiostro|refill\\s+ink|ribbon\\s+cartridge|nastro\\s+inchiostro|waste\\s+toner|toner\\s+waste|serbatoio\\s+inchiostro|maintenance\\s+box|maintenance\\s+kit|plotter\\s+ink|ci\\s*[\\-]?serie|sistema\\s+continuo\\s+inchiostro|continuous\\s+ink\\s+system|ink\\s+bottle|bottiglia\\s+inchiostro|photoconductor|imaging\\s+drum|transfer\\s+belt|kit\\s+manutenzione(?:\\s+stampante)?)\\b",
+      "label": "printer consumables",
+      "veto": true
+    },
+    {
+      "type": "regex",
+      "pattern": "\\b(?:(?:kit|set|pacco|pack|bundle)\\s+(?:di\\s+|of\\s+)?accessor(?:i\\w*|y|ies)|accessor(?:i\\w*|y|ies)\\s+(?:kit|set|per|for|compatibil\\w*)|(?:filtro|filter)\\s+(?:per|for)|(?:protezione|protection)\\s+(?:obiettivo|lens|schermo|screen|elica|propeller|gimbal)|bobina\\s+vuota|(?:eliche|propeller)\\s+(?:di\\s+)?ricambio|pezzi\\s+di\\s+ricambio|spare\\s+parts?|sostituzione\\s+di\\s+pellicol|(?:custodia|case|cover|copertura|guscio)\\s+(?:protettiv\\w*|per\\s+|for\\s+|in\\s+silicone|subacquea)|(?:treppiede|tripod|bastone|monopiede|selfie)\\s+(?:per|for|invisibile)|\\bcaricabatterie\\b(?:\\s+\\w+)?\\s+da\\s+\\d+\\s*w|(?:adattatore|adapter)\\b.{0,30}\\b(?:usb|lightning|type\\s*c)\\b|(?:tubo|tube)\\s+in\\s+ptfe|fep\\s+integrat)\\b",
+      "label": "accessories",
+      "veto": true
+    },
     {
       "type": "keyword",
       "pattern": "filament",
@@ -111,19 +124,7 @@
       "aliases": [
         "ANY CUBIC"
       ],
-      "exclude": [
-        "compatible with",
-        "compatibile con",
-        "custodia per",
-        "case for",
-        "case per",
-        "cover for",
-        "cover per",
-        "sticker",
-        "adesivo",
-        "decal",
-        "decalcomania"
-      ]
+      "exclude": []
     },
     {
       "type": "brand",
@@ -133,19 +134,7 @@
       "aliases": [
         "SPARKX"
       ],
-      "exclude": [
-        "compatible with",
-        "compatibile con",
-        "custodia per",
-        "case for",
-        "case per",
-        "cover for",
-        "cover per",
-        "sticker",
-        "adesivo",
-        "decal",
-        "decalcomania"
-      ]
+      "exclude": []
     },
     {
       "type": "brand",
@@ -155,77 +144,146 @@
       "aliases": [
         "Bambu Lab"
       ],
-      "exclude": [
-        "compatible with",
-        "compatibile con",
-        "custodia per",
-        "case for",
-        "case per",
-        "cover for",
-        "cover per",
-        "sticker",
-        "adesivo",
-        "decal",
-        "decalcomania"
-      ]
+      "exclude": []
     },
     {
       "type": "brand",
       "pattern": "Prusa",
       "score": 9,
       "label": "3D printing",
-      "exclude": [
-        "compatible with",
-        "compatibile con",
-        "custodia per",
-        "case for",
-        "case per",
-        "cover for",
-        "cover per"
-      ]
+      "exclude": []
     },
     {
       "type": "brand",
       "pattern": "Elegoo",
       "score": 8,
       "label": "3D printing",
-      "exclude": [
-        "compatible with",
-        "compatibile con",
-        "custodia per",
-        "case for",
-        "case per",
-        "cover for",
-        "cover per"
-      ]
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Epomaker",
+      "score": 9,
+      "label": "3D printing",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Genmitsu",
+      "score": 8,
+      "label": "3D printing",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Newsoul",
+      "score": 8,
+      "label": "3D printing",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "SainSmart",
+      "score": 8,
+      "label": "3D printing",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Revopoint",
+      "score": 9,
+      "label": "3D printing",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "HYCHIKA",
+      "score": 7,
+      "label": "maker tools",
+      "exclude": []
     },
     {
       "type": "brand",
       "pattern": "DJI",
       "score": 10,
       "label": "drones",
-      "exclude": [
-        "compatible with",
-        "compatibile con",
-        "custodia per",
-        "case for",
-        "case per",
-        "cover for",
-        "cover per",
-        "screen protector",
-        "pellicola protettiva",
-        "salvaschermo",
-        "sticker",
-        "adesivo",
-        "decal",
-        "decalcomania"
-      ]
+      "exclude": []
     },
     {
       "type": "keyword",
       "pattern": "drone",
       "score": 9,
-      "label": "drones"
+      "label": "drones",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "GoPro",
+      "score": 9,
+      "label": "photo/video",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Insta360",
+      "score": 9,
+      "label": "photo/video",
+      "aliases": [
+        "insta360"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Canon",
+      "score": 9,
+      "label": "photo/video",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Nikon",
+      "score": 9,
+      "label": "photo/video",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Godox",
+      "score": 8,
+      "label": "photo/video",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Neewer",
+      "score": 8,
+      "label": "photo/video",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Amaran",
+      "score": 8,
+      "label": "photo/video",
+      "aliases": [
+        "amaran"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Hohem",
+      "score": 8,
+      "label": "photo/video",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "CPS",
+      "score": 7,
+      "label": "photo/video",
+      "exclude": []
     },
     {
       "type": "brand",
@@ -235,15 +293,7 @@
       "aliases": [
         "Nreal"
       ],
-      "exclude": [
-        "compatible with",
-        "compatibile con",
-        "custodia per",
-        "case for",
-        "case per",
-        "cover for",
-        "cover per"
-      ]
+      "exclude": []
     },
     {
       "type": "phrase",
@@ -263,18 +313,10 @@
       "score": 10,
       "label": "audio",
       "exclude": [
-        "compatible with",
-        "compatibile con",
-        "case for",
-        "case per",
-        "custodia per",
-        "cover for",
-        "cover per",
         "wall mount for",
         "supporto a parete per",
         "supporto da muro per",
         "stand for",
-        "supporto per",
         "stativo per"
       ]
     },
@@ -282,7 +324,64 @@
       "type": "brand",
       "pattern": "Razer",
       "score": 8,
-      "label": "audio"
+      "label": "gaming",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Beats",
+      "score": 9,
+      "label": "audio",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Bose",
+      "score": 9,
+      "label": "audio",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "JBL",
+      "score": 9,
+      "label": "audio",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Sennheiser",
+      "score": 9,
+      "label": "audio",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Edifier",
+      "score": 8,
+      "label": "audio",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "GravaStar",
+      "score": 8,
+      "label": "audio",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "VULKKANO",
+      "score": 8,
+      "label": "audio",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "JLab",
+      "score": 7,
+      "label": "audio",
+      "exclude": []
     },
     {
       "type": "brand",
@@ -293,15 +392,7 @@
         "TPLink",
         "TP Link"
       ],
-      "exclude": [
-        "compatible with",
-        "compatibile con",
-        "case for",
-        "case per",
-        "custodia per",
-        "cover for",
-        "cover per"
-      ]
+      "exclude": []
     },
     {
       "type": "brand",
@@ -311,15 +402,7 @@
       "aliases": [
         "UniFi"
       ],
-      "exclude": [
-        "compatible with",
-        "compatibile con",
-        "case for",
-        "case per",
-        "custodia per",
-        "cover for",
-        "cover per"
-      ]
+      "exclude": []
     },
     {
       "type": "phrase",
@@ -353,51 +436,31 @@
       "aliases": [
         "Switch Bot"
       ],
-      "exclude": [
-        "compatible with",
-        "compatibile con",
-        "case for",
-        "case per",
-        "custodia per",
-        "cover for",
-        "cover per"
-      ]
+      "exclude": []
     },
     {
       "type": "brand",
       "pattern": "Aqara",
       "score": 8,
       "label": "smart home",
-      "exclude": [
-        "compatible with",
-        "compatibile con",
-        "case for",
-        "case per",
-        "custodia per",
-        "cover for",
-        "cover per"
-      ]
+      "exclude": []
     },
     {
       "type": "brand",
       "pattern": "Shelly",
       "score": 8,
       "label": "smart home",
-      "exclude": [
-        "compatible with",
-        "compatibile con",
-        "case for",
-        "case per",
-        "custodia per",
-        "cover for",
-        "cover per"
-      ]
+      "exclude": []
     },
     {
-      "type": "keyword",
-      "pattern": "HomeKit",
+      "type": "brand",
+      "pattern": "Nanoleaf",
       "score": 8,
-      "label": "smart home"
+      "label": "smart home",
+      "aliases": [
+        "nanoleaf"
+      ],
+      "exclude": []
     },
     {
       "type": "keyword",
@@ -413,9 +476,261 @@
     },
     {
       "type": "brand",
+      "pattern": "Roborock",
+      "score": 9,
+      "label": "robot vacuum",
+      "requiresAny": [
+        "robot aspirapolvere",
+        "aspirapolvere robot",
+        "robot vacuum",
+        "lavapavimenti",
+        "floor washer",
+        "aspirapolvere e lavapavimenti",
+        "vacuum and mop",
+        "vacuum mop",
+        "qrevo",
+        "saros"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
       "pattern": "Tineco",
       "score": 9,
-      "label": "home appliances"
+      "label": "robot vacuum",
+      "requiresAny": [
+        "robot aspirapolvere",
+        "aspirapolvere robot",
+        "robot vacuum",
+        "lavapavimenti",
+        "floor washer",
+        "floor one",
+        "pure one",
+        "aspirapolvere e lavapavimenti",
+        "aspirapolvere senza filo",
+        "aspirapolvere senza fili",
+        "cordless vacuum",
+        "stick vacuum",
+        "scopa elettrica"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Dreame",
+      "score": 9,
+      "label": "robot vacuum",
+      "requiresAny": [
+        "robot aspirapolvere",
+        "aspirapolvere robot",
+        "robot vacuum",
+        "lavapavimenti",
+        "floor washer",
+        "aspirapolvere e lavapavimenti",
+        "vacuum and mop",
+        "vacuum mop",
+        "aqua",
+        "l10",
+        "l20",
+        "l40",
+        "x40",
+        "matrix"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Ecovacs",
+      "score": 8,
+      "label": "robot vacuum",
+      "aliases": [
+        "Deebot"
+      ],
+      "requiresAny": [
+        "robot aspirapolvere",
+        "aspirapolvere robot",
+        "robot vacuum",
+        "lavapavimenti",
+        "deebot",
+        "aspirapolvere e lavapavimenti",
+        "vacuum and mop",
+        "vacuum mop"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Narwal",
+      "score": 8,
+      "label": "robot vacuum",
+      "requiresAny": [
+        "robot aspirapolvere",
+        "aspirapolvere robot",
+        "robot vacuum",
+        "lavapavimenti",
+        "floor washer",
+        "aspirapolvere e lavapavimenti",
+        "vacuum and mop",
+        "vacuum mop",
+        "freo"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "iRobot",
+      "score": 8,
+      "label": "robot vacuum",
+      "aliases": [
+        "Roomba"
+      ],
+      "requiresAny": [
+        "robot aspirapolvere",
+        "aspirapolvere robot",
+        "robot vacuum",
+        "roomba",
+        "braava",
+        "lavapavimenti"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Mova",
+      "score": 8,
+      "label": "robot vacuum",
+      "requiresAny": [
+        "robot aspirapolvere",
+        "aspirapolvere robot",
+        "robot vacuum",
+        "lavapavimenti",
+        "floor washer",
+        "aspirapolvere e lavapavimenti",
+        "vacuum and mop",
+        "vacuum mop"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Proscenic",
+      "score": 7,
+      "label": "robot vacuum",
+      "requiresAny": [
+        "robot aspirapolvere",
+        "aspirapolvere robot",
+        "robot vacuum",
+        "lavapavimenti",
+        "aspirapolvere e lavapavimenti",
+        "vacuum and mop",
+        "vacuum mop"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "ILIFE",
+      "score": 7,
+      "label": "robot vacuum",
+      "requiresAny": [
+        "robot aspirapolvere",
+        "aspirapolvere robot",
+        "robot vacuum",
+        "lavapavimenti",
+        "aspirapolvere e lavapavimenti"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "phrase",
+      "pattern": "robot aspirapolvere",
+      "score": 8,
+      "label": "robot vacuum"
+    },
+    {
+      "type": "phrase",
+      "pattern": "lavapavimenti",
+      "score": 8,
+      "label": "robot vacuum"
+    },
+    {
+      "type": "phrase",
+      "pattern": "floor washer",
+      "score": 8,
+      "label": "robot vacuum"
+    },
+    {
+      "type": "brand",
+      "pattern": "Dyson",
+      "score": 9,
+      "label": "home appliances",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Shark",
+      "score": 8,
+      "label": "home appliances",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Philips",
+      "score": 8,
+      "label": "home appliances",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Rowenta",
+      "score": 8,
+      "label": "home appliances",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Siemens",
+      "score": 8,
+      "label": "home appliances",
+      "aliases": [
+        "SIEMENS"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Moulinex",
+      "score": 7,
+      "label": "kitchenware",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Krups",
+      "score": 7,
+      "label": "kitchenware",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Lagostina",
+      "score": 8,
+      "label": "kitchenware",
+      "aliases": [
+        "lagostina"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "GHD",
+      "score": 7,
+      "label": "personal care"
+    },
+    {
+      "type": "brand",
+      "pattern": "Schesir",
+      "score": 6,
+      "label": "pet"
     },
     {
       "type": "phrase",
@@ -427,58 +742,301 @@
       "type": "brand",
       "pattern": "LG",
       "score": 8,
-      "label": "monitors",
-      "requiresAny": [
-        "monitor",
-        "display",
-        "schermo",
-        "4k",
-        "qhd",
-        "curved",
-        "curvo",
-        "ips",
-        "oled",
-        "ultrawide"
-      ],
-      "exclude": [
-        "compatible with",
-        "compatibile con",
-        "case for",
-        "case per",
-        "custodia per",
-        "cover for",
-        "cover per"
-      ]
+      "label": "tech",
+      "exclude": []
     },
     {
       "type": "brand",
       "pattern": "Dell",
-      "score": 7,
-      "label": "monitors",
+      "score": 8,
+      "label": "tech",
       "aliases": [
         "Alienware"
       ],
-      "requiresAny": [
-        "monitor",
-        "display",
-        "schermo",
-        "4k",
-        "qhd",
-        "curved",
-        "curvo",
-        "ips",
-        "oled",
-        "ultrawide"
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Lenovo",
+      "score": 8,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "MSI",
+      "score": 8,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "ASUS",
+      "score": 8,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Acer",
+      "score": 8,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "HP",
+      "score": 8,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Logitech",
+      "score": 8,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "ViewSonic",
+      "score": 8,
+      "label": "monitors",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Nothing",
+      "score": 8,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Apple",
+      "score": 9,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Samsung",
+      "score": 8,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Sony",
+      "score": 8,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Google",
+      "score": 8,
+      "label": "tech",
+      "aliases": [
+        "Pixel"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Motorola",
+      "score": 7,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "OnePlus",
+      "score": 8,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Oppo",
+      "score": 7,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Honor",
+      "score": 7,
+      "label": "tech",
+      "aliases": [
+        "HONOR"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Huawei",
+      "score": 7,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Xiaomi",
+      "score": 8,
+      "label": "tech",
+      "aliases": [
+        "XIAOMI",
+        "Redmi",
+        "Readmi"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Realme",
+      "score": 7,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Poco",
+      "score": 7,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Ugreen",
+      "score": 7,
+      "label": "tech",
+      "aliases": [
+        "UGREEN"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Tenda",
+      "score": 7,
+      "label": "networking",
+      "aliases": [
+        "tenda"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Cudy",
+      "score": 7,
+      "label": "networking",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "CHiQ",
+      "score": 7,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "TCL",
+      "score": 7,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Panasonic",
+      "score": 7,
+      "label": "tech",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Terramaster",
+      "score": 8,
+      "label": "storage",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "XP-Pen",
+      "score": 8,
+      "label": "creative",
+      "aliases": [
+        "XPPen",
+        "XP Pen"
+      ],
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "Ultimea",
+      "score": 7,
+      "label": "home entertainment",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "PlayStation",
+      "score": 9,
+      "label": "gaming",
+      "aliases": [
+        "Playstation"
       ],
       "exclude": [
-        "compatible with",
-        "compatibile con",
-        "case for",
-        "case per",
-        "custodia per",
-        "cover for",
-        "cover per"
+        "skin for",
+        "adesivo per"
       ]
+    },
+    {
+      "type": "brand",
+      "pattern": "Pagani",
+      "score": 7,
+      "label": "collectibles"
+    },
+    {
+      "type": "brand",
+      "pattern": "SIHOO",
+      "score": 8,
+      "label": "furniture"
+    },
+    {
+      "type": "brand",
+      "pattern": "Eutour",
+      "score": 7,
+      "label": "wearables",
+      "exclude": []
+    },
+    {
+      "type": "brand",
+      "pattern": "GXTrust",
+      "score": 7,
+      "label": "wishlist brand"
+    },
+    {
+      "type": "brand",
+      "pattern": "Kotlie",
+      "score": 7,
+      "label": "wishlist brand",
+      "aliases": [
+        "kotlie"
+      ]
+    },
+    {
+      "type": "brand",
+      "pattern": "YASHE",
+      "score": 7,
+      "label": "wishlist brand"
+    },
+    {
+      "type": "brand",
+      "pattern": "YQJJGL",
+      "score": 7,
+      "label": "wishlist brand"
     },
     {
       "type": "keyword",
@@ -515,16 +1073,6 @@
       "score": 9,
       "label": "wearables",
       "exclude": [
-        "compatible with",
-        "compatibile con",
-        "case for",
-        "case per",
-        "custodia per",
-        "cover for",
-        "cover per",
-        "band for",
-        "cinturino per",
-        "strap for",
         "cinghia per"
       ]
     },
@@ -634,5 +1182,102 @@
       "score": 9,
       "label": "3D printing"
     }
+  ],
+  "sharedExclude": [
+    "compatible with",
+    "compatibile con",
+    "compatibili con",
+    "panno di ricambio",
+    "panni di ricambio",
+    "panni pulizia",
+    "panno lavabile",
+    "kit accessori",
+    "accessori per",
+    "spazzola di ricambio",
+    "spazzole di ricambio",
+    "rullo di ricambio",
+    "brush roll",
+    "mop pad",
+    "side brush",
+    "spazzola laterale",
+    "filtri di ricambio",
+    "filtro di ricambio",
+    "sacchetti per",
+    "sacchetto per",
+    "dust bag",
+    "custodia per",
+    "case for",
+    "case per",
+    "cover for",
+    "cover per",
+    "custodia protettiva",
+    "custodia in silicone",
+    "kit di custodia",
+    "custodia subacquea",
+    "custodia impermeabile",
+    "custodia",
+    "copertura",
+    "copertura anticollisione",
+    "copertura protettiva",
+    "guscio protettivo",
+    "accessories for",
+    "accessory for",
+    "set accessori",
+    "set di accessori",
+    "kit di accessori",
+    "ricambio per",
+    "ricambio",
+    "ricambi",
+    "replacement for",
+    "replacement",
+    "replacements",
+    "spare part",
+    "spare parts",
+    "pezzi di ricambio",
+    "sostituzione di",
+    "eliche di ricambio",
+    "pellicola",
+    "pellicola protettiva",
+    "screen protector",
+    "salvaschermo",
+    "copriobiettivo",
+    "protezione obiettivo",
+    "protezione schermo",
+    "protezione dell'elica",
+    "gimbal protector",
+    "elica protector",
+    "filtro per",
+    "filter for",
+    "supporto per",
+    "mount for",
+    "treppiede per",
+    "tripod for",
+    "bastone per",
+    "bastone invisibile",
+    "selfie stick",
+    "monopiede per",
+    "manico estensibile",
+    "cinturino per",
+    "strap for",
+    "band for",
+    "caricabatterie per",
+    "charger for",
+    "adattatore per",
+    "adattatore da",
+    "sticker",
+    "adesivo",
+    "decal",
+    "decalcomania",
+    "bobina vuota",
+    "sacchetti per",
+    "bags for",
+    "tubo in ptfe",
+    "ptfe tube",
+    "fep integrate",
+    "video luce led per",
+    "illuminazione ausiliaria",
+    "adattatore usb",
+    "adattatore lightning",
+    "caricabatterie da"
   ]
 }

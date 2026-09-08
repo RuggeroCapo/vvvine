@@ -110,8 +110,7 @@ function parseArgs(argv) {
 
 function loadRules(rulesPath) {
   const raw = readFileSync(rulesPath, 'utf8');
-  const payload = JSON.parse(raw);
-  return payload.rules || [];
+  return JSON.parse(raw);
 }
 
 function main() {
@@ -132,9 +131,9 @@ function main() {
     process.exit(1);
   }
 
-  let rules;
+  let payload;
   try {
-    rules = loadRules(opts.rulesPath);
+    payload = loadRules(opts.rulesPath);
   } catch (error) {
     console.error(`Failed to load rules from ${opts.rulesPath}:`, error.message);
     process.exit(1);
@@ -148,7 +147,8 @@ function main() {
     title: opts.title,
     queue: opts.queue,
     value: opts.value,
-    rules,
+    rules: payload.rules || [],
+    sharedExclude: payload.sharedExclude || [],
     verbose: opts.verbose,
     llmAffinity,
     config: { thresholdPercent: opts.threshold }

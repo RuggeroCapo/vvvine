@@ -24,60 +24,18 @@ class AutopickManager extends BaseManager {
   }
 
   getDefaultConfig() {
+    const scoring = window.AutopickScoringCore.mergeConfig({});
     return {
+      ...scoring,
       enabled: false,
+      // liveOrdering === true means real orders are placed (rocket triggered).
+      // dryRun is kept as its mirror so older code/configs keep working.
+      liveOrdering: false,
       dryRun: true,
-      thresholdPercent: 75,
       cooldownSeconds: 30,
       dailyCap: 5,
       globalValueCeiling: 1500,
       allowParentAutopick: false,
-      unknownAffinityScore: 0,
-      unknownValueScore: 0,
-      unknownQueueScore: 5,
-      mustPickConfidenceFloor: 100,
-      mustPickValueCeiling: 1000,
-      // Minimum affinity to be order-eligible: value+queue alone can never trigger an order.
-      affinityFloor: 6,
-      // Pillar weights — affinity dominates; queue is a constant per page so it barely discriminates.
-      weights: {
-        affinity: 0.60,
-        value: 0.25,
-        queue: 0.15
-      },
-      // Precision of the evidence by rule type: a brand hit is stronger than a generic keyword.
-      typeWeights: {
-        brand: 1.0,
-        phrase: 0.95,
-        regex: 0.9,
-        keyword: 0.75
-      },
-      // Bonus per additional distinct rule label matched (multi-signal titles outrank coincidences).
-      stackBonusPerLabel: 0.5,
-      queueScores: {
-        last_chance: 10,
-        potluck: 9,
-        encore: 7,
-        search: 5,
-        unknown: 5
-      },
-      // Piecewise-linear value curve (control points, interpolated). Replaces the old step tiers.
-      valueCurve: [
-        { value: 0, score: 1 },
-        { value: 50, score: 4 },
-        { value: 120, score: 10 },
-        { value: 300, score: 10 },
-        { value: 600, score: 8 },
-        { value: 1000, score: 5 },
-        { value: 1500, score: 2 }
-      ],
-      // Legacy step tiers — only used if valueCurve is absent/empty in a saved config.
-      valueTiers: [
-        { max: 50, score: 3 },
-        { max: 300, score: 10 },
-        { max: 1000, score: 7 },
-        { max: Infinity, score: 2 }
-      ],
       llm: {
         enabled: false,
         provider: 'gemini',
@@ -111,6 +69,7 @@ class AutopickManager extends BaseManager {
     console.log('[AutopickManager] Initialized', {
       rules: this.rules.length,
       enabled: this.config.enabled,
+      mode: this.config.liveOrdering ? 'LIVE (real orders)' : 'dry-run (would-pick)',
       llmEnabled: this.config.llm?.enabled
     });
   }
@@ -197,7 +156,7 @@ class AutopickManager extends BaseManager {
 
   mergeConfig(partial) {
     const defaults = this.getDefaultConfig();
-    return {
+    const merged = {
       ...defaults,
       ...partial,
       weights: { ...defaults.weights, ...(partial.weights || {}) },
@@ -209,6 +168,14 @@ class AutopickManager extends BaseManager {
       valueTiers: partial.valueTiers || defaults.valueTiers,
       llm: { ...defaults.llm, ...(partial.llm || {}) }
     };
+
+    // Single source of truth: liveOrdering. Legacy configs only carried dryRun.
+    merged.liveOrdering = partial.liveOrdering !== undefined
+      ? partial.liveOrdering === true
+      : partial.dryRun === false;
+    merged.dryRun = !merged.liveOrdering;
+
+    return merged;
   }
 
   async saveConfig() {
@@ -220,7 +187,9 @@ class AutopickManager extends BaseManager {
   }
 
   applyConfig(partial) {
+    const wasLive = this.config.enabled && this.config.liveOrdering;
     this.config = this.mergeConfig(partial);
+    this.announceModeChange(wasLive);
     if (this.config.enabled) {
       this.scoredAsins.clear();
       this.scoreAllVisibleItems();
@@ -238,7 +207,9 @@ class AutopickManager extends BaseManager {
       }
 
       const payload = await response.json();
-      this.rules = this.compileRules(payload.rules || []);
+      this.rules = window.AutopickScoringCore.compileRules(payload.rules || [], {
+        sharedExclude: payload.sharedExclude || []
+      });
       this.rulesLoaded = true;
       console.log(`[AutopickManager] Loaded ${this.rules.length} rules`);
     } catch (error) {
@@ -248,216 +219,16 @@ class AutopickManager extends BaseManager {
     }
   }
 
-  escapeRegex(text) {
-    return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
-  // Word-boundary, whitespace-flexible phrase matcher — used for pattern lists (rule aliases
-  // that aren't type:regex) and for requiresAny/exclude guards regardless of word count.
-  compilePhraseRegex(pattern) {
-    const parts = pattern.toLowerCase().trim().split(/\s+/).map((p) => this.escapeRegex(p));
-    return new RegExp(`\\b${parts.join('\\s+')}\\b`, 'i');
-  }
-
-  compilePatternList(patterns) {
-    if (!patterns || patterns.length === 0) {
-      return null;
-    }
-    return patterns.map((pattern) => this.compilePhraseRegex(pattern));
-  }
-
-  compileRules(rawRules) {
-    const compiled = rawRules.map((rule) => {
-      const patterns = [rule.pattern, ...(rule.aliases || [])].filter(Boolean);
-      let regexes;
-
-      if (rule.type === 'regex') {
-        regexes = patterns.map((pattern) => new RegExp(pattern, 'i'));
-      } else if (rule.type === 'phrase') {
-        regexes = patterns.map((pattern) => this.compilePhraseRegex(pattern));
-      } else {
-        regexes = patterns.map((pattern) => new RegExp(`\\b${this.escapeRegex(pattern)}\\b`, 'i'));
-      }
-
-      return {
-        ...rule,
-        regexes,
-        // Guard clauses: requiresAny gates generic/mustPick rules on co-occurring evidence
-        // (e.g. "filament" mustPick only fires alongside pla/petg/3d-printer words); exclude
-        // vetoes known false-positive contexts (e.g. brand rules matching "compatible with X").
-        requiresAnyRegexes: this.compilePatternList(rule.requiresAny),
-        excludeRegexes: this.compilePatternList(rule.exclude)
-      };
-    });
-
-    return compiled.sort((a, b) => {
-      if (a.mustPick !== b.mustPick) {
-        return a.mustPick ? -1 : 1;
-      }
-      return (b.score || 0) - (a.score || 0);
-    });
-  }
-
-  // Precision weight of the rule's evidence type — a brand hit is stronger signal than a
-  // generic keyword, so it should move the affinity score more.
-  weightedRuleScore(rule) {
-    const typeWeight = this.config.typeWeights?.[rule.type] ?? 1;
-    return (rule.score || 0) * typeWeight;
-  }
-
-  // Returns every rule that matches title AND passes its requiresAny/exclude guards.
-  matchAllRules(title) {
-    if (!title || this.rules.length === 0) {
-      return [];
-    }
-
-    const normalized = title.toLowerCase();
-    const matched = [];
-
-    for (const rule of this.rules) {
-      const hit = rule.regexes.some((regex) => regex.test(normalized));
-      if (!hit) {
-        continue;
-      }
-      if (rule.excludeRegexes && rule.excludeRegexes.some((regex) => regex.test(normalized))) {
-        continue;
-      }
-      if (rule.requiresAnyRegexes && !rule.requiresAnyRegexes.some((regex) => regex.test(normalized))) {
-        continue;
-      }
-      matched.push(rule);
-    }
-
-    return matched;
-  }
-
-  selectBestRule(matches) {
-    let best = null;
-
-    for (const rule of matches) {
-      if (
-        !best ||
-        rule.mustPick && !best.mustPick ||
-        (rule.mustPick === best.mustPick && this.weightedRuleScore(rule) > this.weightedRuleScore(best))
-      ) {
-        best = rule;
-      }
-    }
-
-    return best;
-  }
-
-  matchBestRule(title) {
-    return this.selectBestRule(this.matchAllRules(title));
-  }
-
-  scoreQueue(queue) {
-    const scores = this.config.queueScores || {};
-    return scores[queue] ?? scores.unknown ?? this.config.unknownQueueScore;
-  }
-
-  scoreValueTier(value) {
-    if (value == null || Number.isNaN(value)) {
-      return this.config.unknownValueScore;
-    }
-
-    for (const tier of this.config.valueTiers || []) {
-      if (value <= tier.max) {
-        return tier.score;
-      }
-    }
-
-    return this.config.unknownValueScore;
-  }
-
-  // Piecewise-linear interpolation over valueCurve control points — replaces the old step
-  // tiers so two items a euro apart on either side of a boundary don't score 20+ points apart.
-  interpolateValueCurve(value, curve) {
-    const points = [...curve].sort((a, b) => a.value - b.value);
-    if (value <= points[0].value) {
-      return points[0].score;
-    }
-
-    const last = points[points.length - 1];
-    if (value >= last.value) {
-      return last.score;
-    }
-
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[i];
-      const p1 = points[i + 1];
-      if (value >= p0.value && value <= p1.value) {
-        const t = (value - p0.value) / (p1.value - p0.value);
-        return p0.score + t * (p1.score - p0.score);
-      }
-    }
-
-    return this.config.unknownValueScore;
-  }
-
-  scoreValue(value) {
-    if (value == null || Number.isNaN(value)) {
-      return this.config.unknownValueScore;
-    }
-
-    const curve = this.config.valueCurve;
-    if (Array.isArray(curve) && curve.length > 0) {
-      return this.interpolateValueCurve(value, curve);
-    }
-
-    return this.scoreValueTier(value);
-  }
-
-  clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
-
-  maxValueTierScore() {
-    const tiers = this.config.valueTiers || [];
-    return tiers.reduce((max, tier) => Math.max(max, tier.score || 0), 0);
-  }
-
-  maxValueScore() {
-    const curve = this.config.valueCurve;
-    if (Array.isArray(curve) && curve.length > 0) {
-      return curve.reduce((max, point) => Math.max(max, point.score || 0), 0);
-    }
-    return this.maxValueTierScore();
-  }
-
-  // Weighted blend of the three pillars, 0-100. Affinity dominates by default (see
-  // getDefaultConfig().weights) so a generic queue/value coincidence can no longer outvote
-  // "this item has nothing to do with my interests".
-  computeConfidence(affinityScore, valueScore, queueScore) {
-    const weights = this.config.weights || { affinity: 1 / 3, value: 1 / 3, queue: 1 / 3 };
-    const totalWeight = (weights.affinity || 0) + (weights.value || 0) + (weights.queue || 0);
-    if (!totalWeight) {
-      return 0;
-    }
-
-    const weighted = (
-      this.clamp(affinityScore, 0, 10) * (weights.affinity || 0) +
-      this.clamp(valueScore, 0, 10) * (weights.value || 0) +
-      this.clamp(queueScore, 0, 10) * (weights.queue || 0)
-    ) / totalWeight;
-
-    return Math.round((weighted / 10) * 100);
-  }
-
-  canBeDecisive(ctx) {
-    // When value is still unknown (unmatched items skip the fetch), assume the best-case value
-    // score for the gate so "decisive-only" stays honest without starving the LLM fallback.
-    const valueContribution = ctx.valueKnown ? ctx.valueScore : this.maxValueScore();
-    const maxConfidence = this.computeConfidence(10, valueContribution, ctx.queueScore);
-    return maxConfidence >= this.config.thresholdPercent;
-  }
-
-  normalizeTitle(title) {
-    return (title || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  // Transient view of the config for the core. Compiled rules are attached here and only here:
+  // this.config is persisted to chrome.storage and must never contain RegExp objects.
+  getScoringConfig() {
+    return { ...this.config, _compiledRules: this.rules };
   }
 
   parsePriceText(text) {
-    if (!text) {
+    // Careful: a real ETV of 0 (typical for Amazon-brand items) is falsy but valid,
+    // so only null/undefined/'' count as "no value".
+    if (text == null || text === '') {
       return null;
     }
 
@@ -512,10 +283,13 @@ class AutopickManager extends BaseManager {
 
       const payload = await response.json();
       const result = payload?.result || payload || {};
-      const taxValue = result.receiptData?.taxValue ||
-        result.receiptData?.taxValueAmount?.amount ||
-        result.taxValue ||
-        result.etv;
+      // First *present* candidate, not first truthy one: `||` would discard a legitimate ETV of 0.
+      const taxValue = [
+        result.receiptData?.taxValue,
+        result.receiptData?.taxValueAmount?.amount,
+        result.taxValue,
+        result.etv
+      ].find((candidate) => candidate != null && candidate !== '');
 
       const value = typeof taxValue === 'number'
         ? taxValue
@@ -574,7 +348,7 @@ class AutopickManager extends BaseManager {
   }
 
   async scoreAffinityViaLlm(item) {
-    const cacheKey = this.normalizeTitle(item.title);
+    const cacheKey = window.AutopickScoringCore.normalizeTitle(item.title);
     if (this.llmCache.has(cacheKey)) {
       return this.llmCache.get(cacheKey);
     }
@@ -609,130 +383,64 @@ class AutopickManager extends BaseManager {
     return response;
   }
 
-  async resolveAffinity(item, ctx) {
-    const matches = ctx.matches || this.matchAllRules(item.title);
-    const rule = ctx.rule || this.selectBestRule(matches);
-
-    if (rule?.mustPick) {
-      return {
-        score: 10,
-        source: 'rule',
-        rule,
-        override: true,
-        reason: rule.label || rule.pattern
-      };
-    }
-
-    if (rule) {
-      // Multi-signal titles (e.g. "Creality 3D printer PLA filament" hits both a brand rule
-      // and a 3D-printing keyword) outrank a single coincidental keyword match.
-      const base = this.clamp(this.weightedRuleScore(rule), 0, 10);
-      const distinctLabels = new Set(matches.map((m) => m.label || m.pattern)).size;
-      const stackBonus = Math.max(0, distinctLabels - 1) * (this.config.stackBonusPerLabel || 0);
-
-      return {
-        score: this.clamp(base + stackBonus, 0, 10),
-        source: 'rule',
-        rule,
-        override: false,
-        reason: rule.label || rule.pattern
-      };
-    }
-
-    const llm = this.config.llm || {};
-    if (llm.enabled && this.canBeDecisive(ctx)) {
-      const verdict = await this.scoreAffinityViaLlm(item);
-      if (verdict.ok) {
-        return {
-          score: this.clamp(verdict.score, 0, 10),
-          source: 'llm',
-          rule: null,
-          override: false,
-          reason: verdict.reason || ''
-        };
-      }
-    }
-
-    return {
-      score: this.config.unknownAffinityScore,
-      source: 'unknown',
-      rule: null,
-      override: false,
-      reason: ''
-    };
-  }
-
   // Pure scoring — produces the pillar breakdown plus override/needsValue flags.
   // The final decision (simulated/skipped/ordered/failed) is set later by decide()/drainOrderQueue().
   async scoreItem(item) {
-    const queueScore = this.scoreQueue(item.queue);
-    const matches = this.matchAllRules(item.title);
-    const rule = this.selectBestRule(matches);
-    let valueResult = await this.resolveValue(item, Boolean(rule));
-    let valueScore = valueResult.value != null
-      ? this.scoreValue(valueResult.value)
-      : this.config.unknownValueScore;
-
-    const affinity = await this.resolveAffinity(item, {
-      valueScore,
-      queueScore,
-      valueKnown: valueResult.value != null,
-      thresholdPercent: this.config.thresholdPercent,
-      rule,
-      matches
+    const core = window.AutopickScoringCore;
+    const config = this.getScoringConfig();
+    const scoreWith = (value, llmAffinity = null) => core.computeScore({
+      title: item.title,
+      queue: item.queue,
+      value,
+      config,
+      llmAffinity
     });
 
-    let override = false;
-    let needsValue = false;
-    let confidence;
+    // 1. Rule-only pass: a non-veto rule match is what justifies the cost of a detail fetch.
+    const preliminary = scoreWith(null);
+    const ruleMatched = preliminary.affinitySource === 'rule';
 
-    if (affinity.override) {
-      // mustPick value-ceiling: a value above the ceiling cancels the override; an unobtainable
-      // value (when a ceiling is set) means we cannot honor it → flag needs-value.
-      if (valueResult.value == null && this.config.mustPickValueCeiling) {
-        const fetched = await this.fetchItemValue(item);
-        if (fetched.value != null) {
-          valueResult = fetched;
-          valueScore = this.scoreValue(fetched.value);
-        }
-      }
+    // 2. Value: live price → tile ETV → detail fetch (rule-matched only) → unknown.
+    let valueResult = await this.resolveValue(item, ruleMatched);
+    let llmAffinity = null;
+    let result = scoreWith(valueResult.value);
 
-      if (
-        this.config.mustPickValueCeiling &&
-        valueResult.value != null &&
-        valueResult.value > this.config.mustPickValueCeiling
-      ) {
-        override = false;
-        confidence = this.computeConfidence(affinity.score, valueScore, queueScore);
-      } else if (this.config.mustPickValueCeiling && valueResult.value == null) {
-        needsValue = true;
-        confidence = this.computeConfidence(affinity.score, valueScore, queueScore);
-      } else {
-        override = true;
-        confidence = this.config.mustPickConfidenceFloor;
+    // 3. LLM fallback only when rules said nothing and the gate says it could matter.
+    if (result.affinitySource === 'unknown' && this.config.llm?.enabled && result.canBeDecisive) {
+      const verdict = await this.scoreAffinityViaLlm(item);
+      if (verdict.ok) {
+        llmAffinity = { score: verdict.score, reason: verdict.reason || '' };
+        result = scoreWith(valueResult.value, llmAffinity);
       }
-    } else {
-      confidence = this.computeConfidence(affinity.score, valueScore, queueScore);
+    }
+
+    // 4. mustPick with a value ceiling but no value: one more fetch attempt (unchanged behaviour).
+    if (result.needsValue && valueResult.value == null) {
+      const fetched = await this.fetchItemValue(item);
+      if (fetched.value != null) {
+        valueResult = fetched;
+        result = scoreWith(fetched.value, llmAffinity);
+      }
     }
 
     return {
       scored: true,
-      confidence,
-      affinityScore: affinity.score,
-      valueScore,
-      queueScore,
-      affinitySource: affinity.source,
-      rule: affinity.rule ? {
-        type: affinity.rule.type,
-        pattern: affinity.rule.pattern,
-        label: affinity.rule.label,
-        mustPick: Boolean(affinity.rule.mustPick)
+      confidence: result.confidence,
+      affinityScore: result.affinityScore,
+      valueScore: result.valueScore,
+      queueScore: result.queueScore,
+      affinitySource: result.affinitySource,
+      rule: result.rule ? {
+        type: result.rule.type,
+        pattern: result.rule.pattern,
+        label: result.rule.label,
+        mustPick: Boolean(result.rule.mustPick)
       } : null,
-      llmReason: affinity.source === 'llm' ? affinity.reason : null,
+      llmReason: result.affinitySource === 'llm' ? result.affinityReason : null,
       value: valueResult.value,
       valueSource: valueResult.valueSource,
-      override,
-      needsValue,
+      override: result.override,
+      needsValue: result.needsValue,
       decision: 'pending',
       reason: '',
       at: Date.now()
@@ -776,54 +484,111 @@ class AutopickManager extends BaseManager {
         return 'Rules';
       case 'llm':
         return 'AI';
+      case 'veto':
+        return 'Veto';
       default:
-        return '—';
+        return 'None';
     }
   }
 
-  // Fast rule-only score for notifications (no LLM, no value fetch).
+  getPickVerdict(scoreData) {
+    if (scoreData.override) {
+      return { label: 'MUST PICK', className: 'vine-autopick-verdict-must' };
+    }
+    if (scoreData.confidence >= this.config.thresholdPercent) {
+      return { label: 'PICK', className: 'vine-autopick-verdict-pick' };
+    }
+    return { label: 'SKIP', className: 'vine-autopick-verdict-skip' };
+  }
+
+  // Fast rule-only score for notifications (no LLM, no value fetch). Uses a value only if the item
+  // already carries one; otherwise confidence is normalized over affinity + queue.
   getQuickNotificationScore(item) {
     if (!this.rulesLoaded || !item?.title) {
       return null;
     }
 
-    const matches = this.matchAllRules(item.title);
-    const rule = this.selectBestRule(matches);
-    if (!rule) {
+    const rawValue = item.price ?? item.value ?? null;
+    const value = rawValue != null && !Number.isNaN(Number(rawValue)) ? Number(rawValue) : null;
+    const result = window.AutopickScoringCore.computeScore({
+      title: item.title,
+      queue: item.queue,
+      value,
+      config: this.getScoringConfig()
+    });
+
+    if (result.affinitySource !== 'rule' && result.affinitySource !== 'veto') {
       return null;
     }
 
-    const queueScore = this.scoreQueue(item.queue);
-    const valueScore = this.config.unknownValueScore;
-    let affinityScore;
-    let override = false;
-
-    if (rule.mustPick) {
-      affinityScore = 10;
-      override = true;
-    } else {
-      const base = this.clamp(this.weightedRuleScore(rule), 0, 10);
-      const distinctLabels = new Set(matches.map((m) => m.label || m.pattern)).size;
-      const stackBonus = Math.max(0, distinctLabels - 1) * (this.config.stackBonusPerLabel || 0);
-      affinityScore = this.clamp(base + stackBonus, 0, 10);
-    }
-
-    const confidence = override
+    // Keep today's notification semantics: a mustPick rule shows as 100%.
+    const confidence = result.rule?.mustPick && result.affinitySource === 'rule'
       ? this.config.mustPickConfidenceFloor
-      : this.computeConfidence(affinityScore, valueScore, queueScore);
+      : result.confidence;
 
     return {
       scored: true,
-      affinityScore,
+      affinityScore: result.affinityScore,
       confidence,
-      affinitySource: 'rule',
-      rule: {
-        type: rule.type,
-        pattern: rule.pattern,
-        label: rule.label,
-        mustPick: Boolean(rule.mustPick)
-      }
+      affinitySource: result.affinitySource,
+      rule: result.rule ? {
+        type: result.rule.type,
+        pattern: result.rule.pattern,
+        label: result.rule.label,
+        mustPick: Boolean(result.rule.mustPick)
+      } : null
     };
+  }
+
+  formatScoreDisplay(value) {
+    if (value == null || Number.isNaN(Number(value))) {
+      return '—';
+    }
+    const n = Number(value);
+    if (Number.isInteger(n) || Math.abs(n - Math.round(n)) < 0.05) {
+      return String(Math.round(n));
+    }
+    return n.toFixed(1);
+  }
+
+  escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  buildScoreTooltipHtml(scoreData, verdict, threshold) {
+    const affinity = this.formatScoreDisplay(scoreData.affinityScore);
+    const value = this.formatScoreDisplay(scoreData.valueScore);
+    const queue = this.formatScoreDisplay(scoreData.queueScore);
+    const confidence = this.formatScoreDisplay(scoreData.confidence);
+    const valueLine = scoreData.value != null
+      ? ` (${this.formatScoreDisplay(scoreData.value)} €)`
+      : '';
+
+    const rows = [
+      ['Pick score', `${confidence}% (need ${threshold}%)`],
+      ['Verdict', verdict.label],
+      ['Affinity', `${affinity}/10 · ${this.getSourceLabel(scoreData.affinitySource)}`],
+      ['Value', `${value}/10${valueLine}`],
+      ['Queue', `${queue}/10`]
+    ];
+
+    if (scoreData.rule?.label || scoreData.rule?.pattern) {
+      rows.push(['Matched rule', scoreData.rule.label || scoreData.rule.pattern]);
+    }
+    if (scoreData.llmReason) {
+      rows.push(['AI reason', scoreData.llmReason]);
+    }
+
+    return rows.map(([label, detail]) => `
+      <div class="vine-autopick-tooltip-row">
+        <span class="vine-autopick-tooltip-label">${label}</span>
+        <span class="vine-autopick-tooltip-value">${this.escapeHtml(detail)}</span>
+      </div>
+    `).join('');
   }
 
   getScoreClass(confidence) {
@@ -837,6 +602,27 @@ class AutopickManager extends BaseManager {
       return 'vine-autopick-low';
     }
     return 'vine-autopick-min';
+  }
+
+  syncTileToolbarButtons(tile) {
+    const slot = tile?.querySelector('.vine-autopick-actions');
+    if (!slot) {
+      return;
+    }
+
+    const rocket = tile.querySelector('.vine-rocket-btn');
+    const seen = tile.querySelector('.vine-mark-seen');
+    if (rocket && rocket.parentElement !== slot) {
+      slot.appendChild(rocket);
+    }
+    if (seen && seen.parentElement !== slot) {
+      slot.appendChild(seen);
+    }
+  }
+
+  getTileActionHost(tile) {
+    return tile?.querySelector('.vine-autopick-actions') ||
+      tile?.querySelector('.vvp-item-tile-content');
   }
 
   renderScoreBadge(tile, scoreData) {
@@ -853,38 +639,62 @@ class AutopickManager extends BaseManager {
     if (!badge) {
       badge = document.createElement('div');
       badge.className = 'vine-autopick-score';
-      content.appendChild(badge);
+      content.prepend(badge);
     }
 
-    badge.className = `vine-autopick-score ${this.getScoreClass(scoreData.confidence)} vine-autopick-source-${scoreData.affinitySource}`;
-    badge.title = [
-      `Confidence: ${scoreData.confidence}%`,
-      `Affinity: ${scoreData.affinityScore}/10 (${this.getSourceLabel(scoreData.affinitySource)})`,
-      `Value: ${scoreData.valueScore}/10`,
-      `Queue: ${scoreData.queueScore}/10`,
-      scoreData.rule ? `Rule: ${scoreData.rule.label || scoreData.rule.pattern}` : '',
-      scoreData.llmReason ? `AI: ${scoreData.llmReason}` : ''
-    ].filter(Boolean).join('\n');
+    const verdict = this.getPickVerdict(scoreData);
+    const threshold = this.config.thresholdPercent;
+    const fillWidth = Math.max(0, Math.min(100, scoreData.confidence));
+    const thresholdLeft = Math.max(0, Math.min(100, threshold));
 
+    badge.className = `vine-autopick-score ${this.getScoreClass(scoreData.confidence)} vine-autopick-source-${scoreData.affinitySource}`;
     badge.innerHTML = `
-      <span class="vine-autopick-confidence">${scoreData.confidence}%</span>
-      <span class="vine-autopick-source">${this.getSourceLabel(scoreData.affinitySource)}</span>
+      <div class="vine-autopick-score-row">
+        <button type="button" class="vine-autopick-score-trigger" aria-label="Pick score ${this.formatScoreDisplay(scoreData.confidence)} percent, ${verdict.label}. Hover for breakdown.">
+          <span class="vine-autopick-confidence">${this.formatScoreDisplay(scoreData.confidence)}</span>
+          <span class="vine-autopick-pct">%</span>
+          <span class="vine-autopick-verdict ${verdict.className}">${verdict.label}</span>
+        </button>
+        <div class="vine-autopick-meter" aria-hidden="true">
+          <div class="vine-autopick-meter-fill" style="width:${fillWidth}%"></div>
+          <div class="vine-autopick-meter-threshold" style="left:${thresholdLeft}%"></div>
+        </div>
+        <div class="vine-autopick-actions"></div>
+      </div>
+      <div class="vine-autopick-tooltip" role="tooltip">
+        ${this.buildScoreTooltipHtml(scoreData, verdict, threshold)}
+      </div>
     `;
 
+    this.syncTileToolbarButtons(tile);
+
+    tile.classList.add('vine-has-autopick-score');
     tile.dataset.vineAutopickConfidence = String(scoreData.confidence);
     tile.dataset.vineAutopickSource = scoreData.affinitySource;
+    tile.dataset.vineAutopickVerdict = verdict.label;
   }
 
   clearScoreBadge(tile) {
     tile?.querySelector('.vine-autopick-score')?.remove();
     if (tile) {
+      tile.classList.remove('vine-has-autopick-score');
       delete tile.dataset.vineAutopickConfidence;
       delete tile.dataset.vineAutopickSource;
+      delete tile.dataset.vineAutopickVerdict;
     }
   }
 
   clearAllScoreBadges() {
-    document.querySelectorAll('.vine-autopick-score').forEach((el) => el.remove());
+    document.querySelectorAll('.vine-autopick-score').forEach((el) => {
+      const tile = el.closest('.vvp-item-tile');
+      el.remove();
+      if (tile) {
+        tile.classList.remove('vine-has-autopick-score');
+        delete tile.dataset.vineAutopickConfidence;
+        delete tile.dataset.vineAutopickSource;
+        delete tile.dataset.vineAutopickVerdict;
+      }
+    });
   }
 
   extractItemFromTile(tile) {
@@ -993,6 +803,10 @@ class AutopickManager extends BaseManager {
     if (!score.override && score.confidence < this.config.thresholdPercent) {
       return { eligible: false, decision: 'skipped', reason: 'below-threshold' };
     }
+    // Never order blind: the global value ceiling cannot be enforced without a value.
+    if (!score.override && score.value == null && this.config.globalValueCeiling) {
+      return { eligible: false, decision: 'skipped', reason: 'needs-value' };
+    }
     if (item.asin && this.runtime.attemptedAsins.has(item.asin)) {
       return { eligible: false, decision: 'skipped', reason: 'duplicate' };
     }
@@ -1049,13 +863,13 @@ class AutopickManager extends BaseManager {
       return;
     }
 
-    if (this.config.dryRun) {
+    if (!this.config.liveOrdering) {
       this.creditOrder(item);
       await this.finalize(item, score, tile, 'simulated', 'dry-run');
       return;
     }
 
-    // Live ordering (default off) — requires master-enabled + session-armed.
+    // Live ordering (default off) — enabled from the popup, still killable per session.
     if (!this.isArmed()) {
       await this.finalize(item, score, tile, 'skipped', 'not-armed');
       return;
@@ -1068,7 +882,7 @@ class AutopickManager extends BaseManager {
     this.runtime.attemptedAsins.add(item.asin);
     await this.saveRuntime();
 
-    const result = await this.placeOrderAndAwait(item);
+    const result = await this.placeOrderAndAwait(item, tile);
     if (result.ok) {
       this.creditOrder(item);
       await this.finalize(item, score, tile, 'ordered', 'placed');
@@ -1107,9 +921,12 @@ class AutopickManager extends BaseManager {
     }
   }
 
-  placeOrderAndAwait(item) {
+  placeOrderAndAwait(item, tile = null) {
     return new Promise((resolve) => {
       const rocket = this.getRocketManager();
+      // Drive the very same path as a manual rocket click, reusing the tile's
+      // button (when rendered) so the user sees the pending state on the item.
+      const button = tile?.querySelector?.('.vine-rocket-btn') || item.tileElement?.querySelector?.('.vine-rocket-btn') || null;
       let done = false;
 
       const finish = (result) => {
@@ -1138,7 +955,7 @@ class AutopickManager extends BaseManager {
       this.on('rocketOrderSuccess', onSuccess);
       this.on('rocketOrderError', onError);
 
-      Promise.resolve(rocket.placeOrder(item, { source: 'autopick' }))
+      Promise.resolve(rocket.placeOrder(item, { source: 'autopick', button }))
         .then((submitted) => {
           if (submitted === false) {
             finish({ ok: false, reason: 'not-submitted' });
@@ -1217,31 +1034,48 @@ class AutopickManager extends BaseManager {
   }
 
   // ---- Arming / kill-switch (gate live ordering only) ----------------------
+  //
+  // Live ordering is armed by the popup toggle (config.liveOrdering). arm()/kill()
+  // stay available from the console as a per-session override: the session kill
+  // flag always wins over the persisted config so ordering can be stopped instantly.
+
+  sessionFlag(key, value) {
+    try {
+      if (value === undefined) {
+        return sessionStorage.getItem(key);
+      }
+      if (value === null) {
+        sessionStorage.removeItem(key);
+      } else {
+        sessionStorage.setItem(key, value);
+      }
+      return value;
+    } catch (error) {
+      // sessionStorage unavailable — treat as unset.
+      return null;
+    }
+  }
 
   arm() {
-    try {
-      sessionStorage.setItem('vineAutopickArmed', 'true');
-    } catch (error) {
-      // sessionStorage unavailable — leave disarmed.
-    }
+    this.sessionFlag('vineAutopickKilled', null);
+    this.sessionFlag('vineAutopickArmed', 'true');
     console.log('[Autopick] Armed for this session');
   }
 
   disarm() {
-    try {
-      sessionStorage.removeItem('vineAutopickArmed');
-    } catch (error) {
-      // ignore
-    }
-    console.log('[Autopick] Disarmed');
+    this.sessionFlag('vineAutopickArmed', null);
+    this.sessionFlag('vineAutopickKilled', 'true');
+    console.log('[Autopick] Disarmed for this session (config live toggle overridden)');
   }
 
   isArmed() {
-    try {
-      return sessionStorage.getItem('vineAutopickArmed') === 'true';
-    } catch (error) {
+    if (this.sessionFlag('vineAutopickKilled') === 'true') {
       return false;
     }
+    if (this.config.liveOrdering) {
+      return true;
+    }
+    return this.sessionFlag('vineAutopickArmed') === 'true';
   }
 
   kill() {
@@ -1261,12 +1095,38 @@ class AutopickManager extends BaseManager {
     return [...this.recentDecisions];
   }
 
+  // True when a qualifying item will actually trigger the rocket order.
+  isLive() {
+    return Boolean(this.config.enabled && this.config.liveOrdering && this.isArmed());
+  }
+
+  // Surface live/dry-run transitions so the mode is never a silent surprise.
+  announceModeChange(wasLive) {
+    const isLive = this.config.enabled && this.config.liveOrdering;
+    if (isLive === wasLive) {
+      return;
+    }
+
+    // A fresh live-ordering opt-in clears any earlier session kill-switch.
+    if (isLive) {
+      this.sessionFlag('vineAutopickKilled', null);
+    }
+
+    const message = isLive
+      ? '🚀 Autopick LIVE: qualifying items will be ordered automatically'
+      : 'Autopick back to dry-run (would-pick only)';
+    console.warn(`[Autopick] ${message}`);
+    this.getRocketManager()?.showToast?.(message, isLive ? 'warning' : 'success', 6000);
+  }
+
   getConfiguration() {
     return JSON.parse(JSON.stringify(this.config));
   }
 
   async updateConfiguration(partial) {
+    const wasLive = this.config.enabled && this.config.liveOrdering;
     this.config = this.mergeConfig(partial);
+    this.announceModeChange(wasLive);
     await this.saveConfig();
 
     if (this.config.enabled) {

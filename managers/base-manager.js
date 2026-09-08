@@ -127,3 +127,36 @@ class EventBus {
 
 // Initialize global event bus
 window.vineEventBus = new EventBus(); 
+// Amazon renders no #vvp-items-grid at all when a queue has no offers
+// (only .vvp-no-offers-msg inside .vvp-tab-content). Managers wait on that
+// selector and monitoring injects into it, so on an empty queue everything
+// that arrives from monitoring would be dropped. Create an empty grid so the
+// page always has a container to work with.
+window.vineEnsureItemsGrid = function ensureItemsGrid() {
+  const existing = document.getElementById('vvp-items-grid');
+  if (existing) {
+    return existing;
+  }
+
+  const tabContent = document.querySelector('.vvp-tab-content');
+  if (!tabContent) {
+    return null;
+  }
+
+  let container = document.getElementById('vvp-items-grid-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'vvp-items-grid-container';
+    container.dataset.vineSyntheticGrid = 'true';
+    tabContent.appendChild(container);
+  }
+
+  const grid = document.createElement('div');
+  grid.id = 'vvp-items-grid';
+  grid.className = 'a-section';
+  grid.dataset.vineSyntheticGrid = 'true';
+  container.appendChild(grid);
+
+  console.log('[Vine Enhancer] No offers on this queue: created empty items grid');
+  return grid;
+};

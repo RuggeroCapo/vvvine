@@ -16,8 +16,6 @@ class KeyboardManager extends BaseManager {
     // Define keyboard shortcuts
     this.keyHandlers.set('a', this.handleToggleAutoNavigation.bind(this));
     this.keyHandlers.set('A', this.handleToggleAutoNavigation.bind(this));
-    this.keyHandlers.set('b', this.handleToggleBookmarkSidebar.bind(this));
-    this.keyHandlers.set('B', this.handleToggleBookmarkSidebar.bind(this));
     this.keyHandlers.set('Escape', this.handleEscapeKey.bind(this));
     this.keyHandlers.set('ArrowLeft', this.handleLeftArrowKey.bind(this));
     this.keyHandlers.set('ArrowRight', this.handleRightArrowKey.bind(this));
@@ -50,10 +48,6 @@ class KeyboardManager extends BaseManager {
       case 'KeyA':
         e.preventDefault();
         this.handleToggleAutoNavigation(e);
-        break;
-      case 'KeyB':
-        e.preventDefault();
-        this.handleToggleBookmarkSidebar(e);
         break;
       case 'ArrowLeft':
         if (e.ctrlKey) {
@@ -159,11 +153,6 @@ class KeyboardManager extends BaseManager {
     if (e.ctrlKey) {
       this.navigatePages(1);
     }
-  }
-
-  handleToggleBookmarkSidebar(e) {
-    // Toggle bookmark sidebar
-    this.emit('toggleBookmarkSidebar');
   }
 
   handleEscapeKey(e) {

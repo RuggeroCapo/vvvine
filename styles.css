@@ -290,10 +290,10 @@ html {
 /* Enhanced image styling */
 .vvp-item-tile-content > img {
   width: 100% !important;
-  max-width: 200px !important;
+  max-width: 100% !important;
   height: auto !important;
   border-radius: 8px !important;
-  align-self: center !important;
+  align-self: stretch !important;
   object-fit: contain !important;
   transition: transform 0.2s ease !important;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
@@ -405,24 +405,24 @@ html {
   z-index: 1 !important;
 }
 
-/* Enhanced mark seen button - Modern & Clean */
+/* Enhanced mark seen button - sits in autopick score strip when present */
 .vine-mark-seen {
   position: absolute !important;
-  top: 12px !important;
-  right: 12px !important;
-  background: white !important;
-  border: 2px solid #e5e7eb !important;
+  top: 8px !important;
+  right: 8px !important;
+  background: oklch(99% 0.005 250) !important;
+  border: 2px solid oklch(88% 0.01 250) !important;
   border-radius: 50% !important;
-  width: 36px !important;
-  height: 36px !important;
+  width: 32px !important;
+  height: 32px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   cursor: pointer !important;
-  font-size: 16px !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  z-index: 20 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  font-size: 14px !important;
+  transition: background 0.15s ease-out, border-color 0.15s ease-out, transform 0.15s ease-out !important;
+  z-index: 30 !important;
+  box-shadow: 0 1px 4px oklch(20% 0.02 250 / 0.15) !important;
 }
 
 .vine-mark-seen:hover {
@@ -450,72 +450,23 @@ html {
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25) !important;
 }
 
-/* Bookmark Button - Modern & Clean */
-.vine-bookmark-btn {
-  position: absolute !important;
-  top: 12px !important;
-  right: 54px !important;
-  background: white !important;
-  border: 2px solid #e5e7eb !important;
-  border-radius: 50% !important;
-  width: 36px !important;
-  height: 36px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  cursor: pointer !important;
-  font-size: 16px !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  z-index: 20 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
-}
-
-.vine-bookmark-btn:hover {
-  background: #f9fafb !important;
-  transform: scale(1.1) rotate(-5deg) !important;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2) !important;
-  border-color: #fb923c !important;
-}
-
-.vine-bookmark-btn:active {
-  transform: scale(0.95) !important;
-}
-
-/* Bookmarked item state - Modern & Clean */
-.vine-bookmarked {
-  border-color: #fb923c !important;
-  background: rgba(245, 158, 11, 0.03) !important;
-}
-
-.vine-bookmarked .vine-bookmark-btn {
-  background: #fb923c !important;
-  color: white !important;
-  border-color: #fb923c !important;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25) !important;
-}
-
-.vine-bookmark-btn:focus {
-  outline: none !important;
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15) !important;
-}
-
 .vine-rocket-btn {
   position: absolute !important;
-  top: 12px !important;
-  right: 96px !important;
-  background: white !important;
-  border: 2px solid #e5e7eb !important;
+  top: 8px !important;
+  right: 46px !important;
+  background: oklch(99% 0.005 250) !important;
+  border: 2px solid oklch(88% 0.01 250) !important;
   border-radius: 50% !important;
-  width: 36px !important;
-  height: 36px !important;
+  width: 32px !important;
+  height: 32px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   cursor: pointer !important;
-  font-size: 16px !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  z-index: 20 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  font-size: 14px !important;
+  transition: background 0.15s ease-out, border-color 0.15s ease-out, transform 0.15s ease-out !important;
+  z-index: 30 !important;
+  box-shadow: 0 1px 4px oklch(20% 0.02 250 / 0.15) !important;
 }
 
 .vine-rocket-btn:hover {
@@ -551,8 +502,9 @@ html {
 }
 
 .vine-overlay-content {
-  width: min(960px, 96vw);
-  max-height: 92vh;
+  /* Enlarged so the live checkout flow stays readable while the order runs */
+  width: min(1200px, 96vw);
+  max-height: 96vh;
   background: #fff;
   border-radius: 14px;
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35);
@@ -592,6 +544,26 @@ html {
   min-width: 40px;
 }
 
+/* Panic button: kills the in-flight order and stops autopick + monitoring */
+.vine-overlay-abort {
+  border: 1px solid #b91c1c;
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.vine-overlay-abort:hover {
+  background: linear-gradient(135deg, #b91c1c, #991b1b);
+}
+
+.vine-overlay-abort:active {
+  transform: translateY(1px);
+}
+
 .vine-checkout-frame {
   width: 1px;
   height: 1px;
@@ -602,7 +574,8 @@ html {
 
 .vine-checkout-frame-visible {
   width: 100%;
-  height: min(78vh, 900px);
+  /* Enlarged so the live checkout flow stays readable while the order runs */
+  height: min(90vh, 1100px);
   opacity: 1;
   border-top: 1px solid #e5e7eb;
 }
@@ -646,65 +619,257 @@ html {
   text-align: right;
 }
 
-/* Autopick score badge */
+/* Autopick toolbar — one row: score | meter | actions */
+.vvp-item-tile-content:has(.vine-autopick-score) {
+  padding: 0 12px 12px !important;
+  gap: 10px !important;
+}
+
 .vine-autopick-score {
-  position: absolute;
-  top: 6px;
-  right: 6px;
+  position: relative;
   z-index: 25;
-  display: inline-flex;
+  width: calc(100% + 24px);
+  margin: 0 -12px 0;
+  padding: 0;
+  border-radius: 12px 12px 0 0;
+  border-bottom: 1px solid oklch(88% 0.01 250);
+  background: oklch(95% 0.008 250);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.vine-autopick-score-row {
+  display: grid;
+  grid-template-columns: auto minmax(48px, 1fr) auto;
   align-items: center;
-  gap: 4px;
-  padding: 3px 7px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: #fff;
-  background: rgba(71, 85, 105, 0.92);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
-  pointer-events: none;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 8px;
+}
+
+.vine-autopick-score-trigger {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  margin: 0;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: oklch(22% 0.02 250);
+  line-height: 1;
+  cursor: help;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.vine-autopick-score-trigger:hover,
+.vine-autopick-score-trigger:focus-visible {
+  background: oklch(90% 0.01 250);
+  outline: none;
 }
 
 .vine-autopick-confidence {
-  letter-spacing: 0.02em;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
 }
 
-.vine-autopick-source {
+.vine-autopick-pct {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.65;
+  margin-right: 5px;
+}
+
+.vine-autopick-verdict {
+  display: inline-block;
+  padding: 2px 5px;
+  border-radius: 4px;
   font-size: 9px;
-  font-weight: 600;
+  font-weight: 800;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  opacity: 0.9;
-  padding-left: 4px;
-  border-left: 1px solid rgba(255, 255, 255, 0.35);
 }
 
-.vine-autopick-high {
-  background: linear-gradient(135deg, #16a34a, #15803d);
+.vine-autopick-verdict-pick {
+  background: oklch(88% 0.08 145);
+  color: oklch(32% 0.1 145);
 }
 
-.vine-autopick-mid {
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+.vine-autopick-verdict-must {
+  background: oklch(88% 0.1 55);
+  color: oklch(38% 0.12 55);
+  animation: vineAutopickMustPulse 1.4s ease-out infinite;
 }
 
-.vine-autopick-low {
-  background: linear-gradient(135deg, #d97706, #b45309);
+.vine-autopick-verdict-skip {
+  background: oklch(90% 0.01 250);
+  color: oklch(48% 0.02 250);
 }
 
-.vine-autopick-min {
-  background: rgba(100, 116, 139, 0.92);
+@keyframes vineAutopickMustPulse {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(65% 0.14 55 / 0.45); }
+  50% { box-shadow: 0 0 0 3px oklch(65% 0.14 55 / 0); }
+}
+
+.vine-autopick-meter {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: oklch(86% 0.01 250);
+  overflow: visible;
+}
+
+.vine-autopick-meter-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: oklch(52% 0.12 250);
+  min-width: 3px;
+  transition: width 0.2s ease-out;
+}
+
+.vine-autopick-meter-threshold {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: oklch(42% 0.04 250);
+  box-shadow: 0 0 0 1px oklch(95% 0.008 250);
+}
+
+.vine-autopick-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.vine-has-autopick-score .vine-rocket-btn,
+.vine-has-autopick-score .vine-mark-seen {
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 13px !important;
+  border-width: 1px !important;
+  box-shadow: none !important;
+  flex-shrink: 0;
+}
+
+.vine-has-autopick-score .vine-rocket-btn:hover,
+.vine-has-autopick-score .vine-mark-seen:hover {
+  transform: none !important;
+}
+
+.vine-autopick-score-trigger:hover + .vine-autopick-meter + .vine-autopick-actions + .vine-autopick-tooltip,
+.vine-autopick-score-trigger:focus-visible + .vine-autopick-meter + .vine-autopick-actions + .vine-autopick-tooltip,
+.vine-autopick-score:hover .vine-autopick-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.vine-autopick-tooltip {
+  position: absolute;
+  top: calc(100% - 1px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  padding: 8px 10px;
+  border-radius: 0 0 8px 8px;
+  background: oklch(24% 0.02 250);
+  border: 1px solid oklch(35% 0.03 250);
+  border-top: none;
+  box-shadow: 0 10px 24px oklch(15% 0.02 250 / 0.28);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out, visibility 0.15s;
+  pointer-events: none;
+}
+
+.vine-autopick-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: oklch(96% 0.005 250);
+}
+
+.vine-autopick-tooltip-row + .vine-autopick-tooltip-row {
+  border-top: 1px solid oklch(32% 0.02 250);
+  margin-top: 2px;
+  padding-top: 4px;
+}
+
+.vine-autopick-tooltip-label {
+  flex-shrink: 0;
+  color: oklch(72% 0.02 250);
+  font-weight: 600;
+}
+
+.vine-autopick-tooltip-value {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+.vine-autopick-high .vine-autopick-meter-fill {
+  background: oklch(48% 0.14 145);
+}
+
+.vine-autopick-mid .vine-autopick-meter-fill {
+  background: oklch(48% 0.14 250);
+}
+
+.vine-autopick-low .vine-autopick-meter-fill {
+  background: oklch(52% 0.12 65);
+}
+
+.vine-autopick-min .vine-autopick-meter-fill {
+  background: oklch(50% 0.03 250);
+}
+
+.vine-autopick-source-veto .vine-autopick-meter-fill {
+  background: oklch(50% 0.12 25);
+}
+
+.vine-autopick-source-veto .vine-autopick-verdict-skip {
+  background: oklch(88% 0.06 25);
+  color: oklch(38% 0.1 25);
 }
 
 .vine-table-autopick {
   display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 4px 8px;
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
   color: #fff;
   background: #64748b;
+}
+
+.vine-table-autopick-confidence {
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.vine-table-autopick-verdict {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.95;
 }
 
 .vine-table-autopick-source {
@@ -842,8 +1007,23 @@ html {
     padding: 0 8px !important;
   }
 
-  .vvp-item-tile-content {
-    padding: 12px !important;
+  .vvp-item-tile-content:has(.vine-autopick-score) {
+    padding: 0 8px 10px !important;
+  }
+
+  .vine-autopick-score {
+    width: calc(100% + 16px);
+    margin-left: -8px;
+    margin-right: -8px;
+  }
+
+  .vine-autopick-confidence {
+    font-size: 18px;
+  }
+
+  .vine-autopick-score-row {
+    gap: 6px;
+    padding: 5px 6px;
   }
 
   .vine-mark-seen {
@@ -852,18 +1032,11 @@ html {
     font-size: 14px !important;
   }
 
-  .vine-bookmark-btn {
-    width: 32px !important;
-    height: 32px !important;
-    font-size: 14px !important;
-    right: 44px !important;
-  }
-
   .vine-rocket-btn {
     width: 32px !important;
     height: 32px !important;
     font-size: 14px !important;
-    right: 76px !important;
+    right: 44px !important;
   }
 }
 
@@ -1124,12 +1297,6 @@ body[data-vine-view="card"] #vvp-items-grid {
   border-color: rgba(16, 185, 129, 0.4);
 }
 
-.vine-table-badge-bookmarked {
-  background: rgba(245, 158, 11, 0.2);
-  color: #d97706;
-  border-color: rgba(245, 158, 11, 0.4);
-}
-
 .vine-table-badge-new {
   background: rgba(59, 130, 246, 0.3);
   color: #2563eb;
@@ -1185,20 +1352,10 @@ body[data-vine-view="card"] #vvp-items-grid {
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
-.vine-table-btn-bookmark:hover {
-  border-color: rgba(245, 158, 11, 0.6);
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-}
-
 /* Table row states */
 .vine-table-row-seen {
   opacity: 0.7;
   background: rgba(16, 185, 129, 0.05);
-}
-
-.vine-table-row-bookmarked {
-  background: rgba(245, 158, 11, 0.05);
-  border-left: 3px solid rgba(245, 158, 11, 0.6);
 }
 
 .vine-table-row-new {

@@ -513,9 +513,15 @@ function showTelegramStatus(message, type) {
   }
 }
 
+// Tracks the last saved live-ordering state so the confirm step only fires on the off -> on edge.
+let autopickLiveWasEnabled = false;
+let autopickLivePendingConfirm = false;
+let autopickLiveConfirmTimer = null;
+
 function getAutopickDefaults() {
   return {
     enabled: false,
+    liveOrdering: false,
     dryRun: true,
     thresholdPercent: 75,
     llm: {
@@ -536,6 +542,10 @@ async function loadAutopickConfig() {
     const llm = { ...getAutopickDefaults().llm, ...(config.llm || {}) };
 
     document.getElementById('autopick-enabled').checked = Boolean(config.enabled);
+    // liveOrdering is the source of truth; fall back to legacy dryRun===false configs.
+    const live = config.liveOrdering !== undefined ? Boolean(config.liveOrdering) : config.dryRun === false;
+    document.getElementById('autopick-live-enabled').checked = live;
+    autopickLiveWasEnabled = live;
     document.getElementById('autopick-threshold').value = config.thresholdPercent ?? 75;
     document.getElementById('autopick-llm-enabled').checked = Boolean(llm.enabled);
     document.getElementById('autopick-gemini-model').value = llm.model || 'gemini-2.0-flash';
@@ -554,10 +564,14 @@ function collectAutopickConfigFromForm() {
     const existing = result.vineAutopickConfig || {};
     const defaults = getAutopickDefaults();
 
+    const liveOrdering = document.getElementById('autopick-live-enabled').checked;
+
     return {
       ...defaults,
       ...existing,
       enabled: document.getElementById('autopick-enabled').checked,
+      liveOrdering,
+      dryRun: !liveOrdering,
       thresholdPercent: parseInt(document.getElementById('autopick-threshold').value, 10) || 75,
       llm: {
         ...defaults.llm,
@@ -576,6 +590,22 @@ function collectAutopickConfigFromForm() {
 async function saveAutopickConfig() {
   try {
     const config = await collectAutopickConfigFromForm();
+
+    // Live ordering spends real Vine picks: require a second Save click to turn it on.
+    // (An in-popup step, not confirm() - a native dialog steals focus and closes the popup.)
+    if (config.enabled && config.liveOrdering && !autopickLiveWasEnabled && !autopickLivePendingConfirm) {
+      autopickLivePendingConfirm = true;
+      clearTimeout(autopickLiveConfirmTimer);
+      autopickLiveConfirmTimer = setTimeout(() => {
+        autopickLivePendingConfirm = false;
+      }, 15000);
+      showAutopickStatus('⚠️ Real Autopick places actual Vine orders. Click Save again to confirm.', 'error');
+      return;
+    }
+
+    clearTimeout(autopickLiveConfirmTimer);
+    autopickLivePendingConfirm = false;
+    autopickLiveWasEnabled = Boolean(config.liveOrdering);
     await chrome.storage.local.set({ vineAutopickConfig: config });
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -590,7 +620,12 @@ async function saveAutopickConfig() {
       }
     }
 
-    showAutopickStatus('Configuration saved!', 'success');
+    showAutopickStatus(
+      config.enabled && config.liveOrdering
+        ? 'Saved - LIVE ordering active'
+        : 'Configuration saved!',
+      config.enabled && config.liveOrdering ? 'error' : 'success'
+    );
 
     const button = document.getElementById('save-autopick-config');
     const originalHTML = button.innerHTML;

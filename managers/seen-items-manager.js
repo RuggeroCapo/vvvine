@@ -122,10 +122,11 @@ class SeenItemsManager extends BaseManager {
       this.toggleItemHidden(asin, item);
     });
 
-    // Position relative to the item
-    const content = item.querySelector('.vvp-item-tile-content');
-    if (content) {
-      content.appendChild(button);
+    // Position in toolbar when autopick header exists, otherwise on tile content.
+    const host = window.vineAutopickManager?.getTileActionHost?.(item) ||
+      item.querySelector('.vvp-item-tile-content');
+    if (host) {
+      host.appendChild(button);
     }
   }
 

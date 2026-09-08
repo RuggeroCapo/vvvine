@@ -80,10 +80,6 @@ class UIManager extends BaseManager {
             <span class="vine-btn-icon">📊</span>
             <span class="vine-btn-text">Table</span>
           </button>
-          <button id="toggle-bookmarks" title="Toggle Bookmarks Sidebar">
-            <span class="vine-btn-icon">📚</span>
-            <span class="vine-btn-text">Bookmarks</span>
-          </button>
         </div>
 
         <div class="vine-control-separator"></div>
@@ -253,11 +249,6 @@ class UIManager extends BaseManager {
       if (confirm('Clear all seen items? This cannot be undone.')) {
         this.emit('clearAllSeen');
       }
-    });
-
-    // Toggle bookmarks sidebar
-    document.getElementById('toggle-bookmarks').addEventListener('click', () => {
-      this.emit('toggleBookmarkSidebar');
     });
 
     // Toggle view mode
@@ -876,13 +867,20 @@ class UIManager extends BaseManager {
   getAutopickScoreHtml(item) {
     const confidence = item.dataset.vineAutopickConfidence;
     const source = item.dataset.vineAutopickSource;
+    const verdict = item.dataset.vineAutopickVerdict;
 
     if (!confidence) {
       return '<span class="vine-table-muted">—</span>';
     }
 
-    return `<span class="vine-table-autopick vine-autopick-${confidence >= 90 ? 'high' : confidence >= 75 ? 'mid' : confidence >= 50 ? 'low' : 'min'}">
-      ${confidence}%
+    const tier = confidence >= 90 ? 'high' : confidence >= 75 ? 'mid' : confidence >= 50 ? 'low' : 'min';
+    const verdictHtml = verdict
+      ? `<span class="vine-table-autopick-verdict">${verdict}</span>`
+      : '';
+
+    return `<span class="vine-table-autopick vine-autopick-${tier}">
+      <span class="vine-table-autopick-confidence">${confidence}%</span>
+      ${verdictHtml}
       <span class="vine-table-autopick-source">${this.getAutopickSourceLabel(source)}</span>
     </span>`;
   }
@@ -914,14 +912,13 @@ class UIManager extends BaseManager {
 
       // Get item states
       const isSeen = item.classList.contains('vine-seen');
-      const isBookmarked = item.classList.contains('vine-bookmarked');
       const isNew = item.classList.contains('vine-new-item');
       const itemId = item.dataset.vineItemId || '';
       const isHidden = item.style.display === 'none';
       const autopickScore = this.getAutopickScoreHtml(item);
 
       return `
-        <tr class="vine-table-row ${isSeen ? 'vine-table-row-seen' : ''} ${isBookmarked ? 'vine-table-row-bookmarked' : ''} ${isNew ? 'vine-table-row-new' : ''}" 
+        <tr class="vine-table-row ${isSeen ? 'vine-table-row-seen' : ''} ${isNew ? 'vine-table-row-new' : ''}" 
             data-item-id="${itemId}" 
             style="${isHidden ? 'display: none;' : ''}">
           <td class="vine-table-cell vine-table-cell-image">
@@ -935,14 +932,10 @@ class UIManager extends BaseManager {
           <td class="vine-table-cell vine-table-cell-score">${autopickScore}</td>
           <td class="vine-table-cell vine-table-cell-status">
             ${isSeen ? '<span class="vine-table-badge vine-table-badge-seen">✓ Seen</span>' : '<span class="vine-table-badge">Not Seen</span>'}
-            ${isBookmarked ? '<span class="vine-table-badge vine-table-badge-bookmarked">⭐ Bookmarked</span>' : ''}
           </td>
           <td class="vine-table-cell vine-table-cell-actions">
             <button class="vine-table-btn vine-table-btn-seen" data-action="toggle-seen" data-item-id="${itemId}" title="${isSeen ? 'Mark as Unseen' : 'Mark as Seen'}">
               ${isSeen ? '👁️' : '👁️‍🗨️'}
-            </button>
-            <button class="vine-table-btn vine-table-btn-bookmark" data-action="toggle-bookmark" data-item-id="${itemId}" title="${isBookmarked ? 'Remove Bookmark' : 'Add Bookmark'}">
-              ${isBookmarked ? '⭐' : '☆'}
             </button>
           </td>
         </tr>
@@ -979,8 +972,6 @@ class UIManager extends BaseManager {
 
       if (action === 'toggle-seen') {
         this.emit('toggleSeenFromTable', { itemId });
-      } else if (action === 'toggle-bookmark') {
-        this.emit('toggleBookmarkFromTable', { itemId });
       }
     });
   }
@@ -1010,26 +1001,6 @@ class UIManager extends BaseManager {
       if (seenBtn) {
         seenBtn.textContent = updates.seen ? '👁️' : '👁️‍🗨️';
         seenBtn.title = updates.seen ? 'Mark as Unseen' : 'Mark as Seen';
-      }
-    }
-
-    if (updates.bookmarked !== undefined) {
-      row.classList.toggle('vine-table-row-bookmarked', updates.bookmarked);
-      const statusCell = row.querySelector('.vine-table-cell-status');
-      const bookmarkBtn = row.querySelector('[data-action="toggle-bookmark"]');
-
-      if (statusCell) {
-        const bookmarkBadge = statusCell.querySelector('.vine-table-badge-bookmarked');
-        if (updates.bookmarked && !bookmarkBadge) {
-          statusCell.insertAdjacentHTML('beforeend', '<span class="vine-table-badge vine-table-badge-bookmarked">⭐ Bookmarked</span>');
-        } else if (!updates.bookmarked && bookmarkBadge) {
-          bookmarkBadge.remove();
-        }
-      }
-
-      if (bookmarkBtn) {
-        bookmarkBtn.textContent = updates.bookmarked ? '⭐' : '☆';
-        bookmarkBtn.title = updates.bookmarked ? 'Remove Bookmark' : 'Add Bookmark';
       }
     }
 

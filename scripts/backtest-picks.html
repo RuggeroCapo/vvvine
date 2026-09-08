@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autopick Backtest — Risultati</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --surface-2: #243044;
+      --border: #2d3a4f;
+      --text: #e8edf4;
+      --muted: #8b9cb3;
+      --accent: #3b82f6;
+      --accent-dim: #2563eb33;
+      --green: #22c55e;
+      --green-dim: #22c55e22;
+      --amber: #f59e0b;
+      --amber-dim: #f59e0b22;
+      --red: #ef4444;
+      --purple: #a78bfa;
+      --radius: 10px;
+      --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+      --mono: "SF Mono", "Cascadia Code", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.5rem;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      color: var(--muted);
+      margin-top: 0.35rem;
+      font-size: 0.95rem;
+    }
+
+    .load-panel {
+      background: var(--surface);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem;
+      text-align: center;
+      margin: 3rem auto;
+      max-width: 480px;
+    }
+
+    .load-panel.hidden { display: none; }
+
+    .load-panel p { color: var(--muted); margin-bottom: 1rem; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.55rem 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .btn:hover { background: var(--border); }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #2563eb; }
+
+    #file-input { display: none; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+
+    .stat-card .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+
+    .stat-card .value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-top: 0.25rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-card.highlight .value { color: var(--green); }
+    .stat-card.warn .value { color: var(--amber); }
+
+    .meta-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1.25rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    .meta-bar span strong { color: var(--text); }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .toolbar input,
+    .toolbar select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      min-width: 0;
+    }
+
+    .toolbar input { flex: 1; min-width: 180px; }
+    .toolbar select { min-width: 140px; }
+
+    .toolbar .count {
+      margin-left: auto;
+      font-size: 0.875rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .category-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .chip {
+      padding: 0.3rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .chip:hover { border-color: var(--accent); color: var(--text); }
+    .chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+    .picks-list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+    .pick-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.15rem;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 1rem;
+      align-items: start;
+      transition: border-color 0.15s;
+    }
+
+    .pick-card:hover { border-color: #3b82f666; }
+
+    .confidence-ring {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+      border: 3px solid;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .confidence-high { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+    .confidence-mid { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+    .confidence-low { border-color: var(--muted); color: var(--muted); background: #8b9cb311; }
+
+    .pick-main { min-width: 0; }
+
+    .pick-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      line-height: 1.35;
+      margin-bottom: 0.5rem;
+    }
+
+    .pick-title a {
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .pick-title a:hover { color: var(--accent); text-decoration: underline; }
+
+    .pick-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.6rem;
+      align-items: center;
+      font-size: 0.78rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 5px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-queue-encore { background: #3b82f622; color: #60a5fa; }
+    .badge-queue-last_chance { background: #f59e0b22; color: #fbbf24; }
+    .badge-queue-potluck { background: #a78bfa22; color: var(--purple); }
+    .badge-must { background: var(--green-dim); color: var(--green); }
+    .badge-override { background: #ef444422; color: #f87171; }
+    .badge-category { background: var(--surface-2); color: var(--muted); }
+
+    .asin {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .pick-scores {
+      text-align: right;
+      font-size: 0.78rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .pick-scores .price {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.35rem;
+    }
+
+    .score-row { margin-top: 0.15rem; }
+
+    .rule-detail {
+      margin-top: 0.6rem;
+      padding: 0.5rem 0.65rem;
+      background: var(--bg);
+      border-radius: 6px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    .rule-detail strong { color: var(--text); font-family: var(--font); }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--muted);
+    }
+
+    #app.hidden { display: none; }
+
+    @media (max-width: 720px) {
+      .pick-card { grid-template-columns: 1fr; }
+      .pick-scores { text-align: left; }
+      .toolbar .count { margin-left: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="load-panel" class="load-panel hidden">
+      <p>Impossibile caricare <code>backtest-picks.json</code> automaticamente.<br>Seleziona il file JSON o avvia un server locale nella cartella <code>scripts/</code>.</p>
+      <button type="button" class="btn btn-primary" id="pick-file-btn">Scegli file JSON</button>
+      <input type="file" id="file-input" accept=".json,application/json">
+    </div>
+
+    <div id="app" class="hidden">
+      <header>
+        <h1>Autopick Backtest</h1>
+        <p>Risultati dello scoring sui prodotti Vine Stats</p>
+      </header>
+
+      <section id="stats"></section>
+      <div id="meta-bar" class="meta-bar"></div>
+
+      <section>
+        <div class="toolbar">
+          <input type="search" id="search" placeholder="Cerca titolo, ASIN, categoria…" autocomplete="off">
+          <select id="filter-queue">
+            <option value="">Tutte le code</option>
+          </select>
+          <select id="sort">
+            <option value="confidence-desc">Confidence ↓</option>
+            <option value="confidence-asc">Confidence ↑</option>
+            <option value="date-desc">Data ↓</option>
+            <option value="date-asc">Data ↑</option>
+            <option value="value-desc">Prezzo ↓</option>
+            <option value="value-asc">Prezzo ↑</option>
+          </select>
+          <label class="btn" style="cursor:pointer">
+            <input type="checkbox" id="must-only" style="margin-right:0.3rem"> Solo must-pick
+          </label>
+          <span class="count" id="visible-count"></span>
+        </div>
+
+        <div id="category-chips" class="category-chips"></div>
+        <div id="picks-list" class="picks-list"></div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const QUEUE_LABELS = {
+      encore: 'Encore',
+      last_chance: 'Last Chance',
+      potluck: 'Potluck',
+      unknown: 'Sconosciuta'
+    };
+
+    let data = null;
+    let activeCategory = '';
+
+    function fmtNum(n) {
+      return Number(n).toLocaleString('it-IT');
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleString('it-IT', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    function fmtMoney(value, currency) {
+      if (value == null || !Number.isFinite(value)) return '—';
+      return new Intl.NumberFormat('it-IT', { style: 'currency', currency: currency || 'EUR' }).format(value);
+    }
+
+    function confidenceClass(c) {
+      if (c >= 85) return 'confidence-high';
+      if (c >= 75) return 'confidence-mid';
+      return 'confidence-low';
+    }
+
+    function renderStats(summary) {
+      const cards = [
+        { label: 'Prodotti analizzati', value: fmtNum(summary.scored) },
+        { label: 'Would pick', value: fmtNum(summary.wouldPick), highlight: true },
+        { label: 'Pick rate', value: summary.pickRate + '%', highlight: true },
+        { label: 'Sotto soglia', value: fmtNum(summary.belowThreshold), warn: true },
+        { label: 'Sotto affinity', value: fmtNum(summary.belowAffinityFloor), warn: true },
+        { label: 'Veto', value: fmtNum(summary.veto) },
+        { label: 'Must pick', value: fmtNum(summary.mustPick), highlight: true },
+        { label: 'Soglia', value: summary.threshold + '%' }
+      ];
+
+      document.getElementById('stats').innerHTML =
+        '<div class="stats-grid">' +
+        cards.map(c => `
+          <div class="stat-card${c.highlight ? ' highlight' : ''}${c.warn ? ' warn' : ''}">
+            <div class="label">${c.label}</div>
+            <div class="value">${c.value}</div>
+          </div>
+        `).join('') +
+        '</div>';
+
+      const parts = [
+        `<span>API: <strong>${summary.baseUrl || '—'}</strong></span>`,
+        `<span>Affinity floor: <strong>${summary.affinityFloor ?? '—'}</strong></span>`,
+        `<span>Dedupe: <strong>${summary.dedupe ? 'sì' : 'no'}</strong></span>`
+      ];
+      if (summary.since) parts.push(`<span>Da: <strong>${summary.since}</strong></span>`);
+      if (summary.until) parts.push(`<span>Fino a: <strong>${summary.until}</strong></span>`);
+      if (summary.queue) parts.push(`<span>Coda filtrata: <strong>${summary.queue}</strong></span>`);
+      document.getElementById('meta-bar').innerHTML = parts.join('');
+    }
+
+    function buildQueueFilter(picks) {
+      const queues = [...new Set(picks.map(p => p.queue).filter(Boolean))].sort();
+      const sel = document.getElementById('filter-queue');
+      sel.innerHTML = '<option value="">Tutte le code</option>' +
+        queues.map(q => `<option value="${q}">${QUEUE_LABELS[q] || q}</option>`).join('');
+    }
+
+    function buildCategoryChips(picks) {
+      const counts = {};
+      for (const p of picks) {
+        const cat = p.affinityReason || p.rule?.label || 'Altro';
+        counts[cat] = (counts[cat] || 0) + 1;
+      }
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      const el = document.getElementById('category-chips');
+      el.innerHTML = '<span class="chip active" data-cat="">Tutte (' + picks.length + ')</span>' +
+        sorted.map(([cat, n]) =>
+          `<span class="chip" data-cat="${escapeAttr(cat)}">${escapeHtml(cat)} (${n})</span>`
+        ).join('');
+
+      el.querySelectorAll('.chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          activeCategory = chip.dataset.cat;
+          el.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c === chip));
+          renderPicks();
+        });
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function escapeAttr(s) {
+      return escapeHtml(s).replace(/'/g, '&#39;');
+    }
+
+    function getFilteredPicks() {
+      const q = document.getElementById('search').value.trim().toLowerCase();
+      const queue = document.getElementById('filter-queue').value;
+      const mustOnly = document.getElementById('must-only').checked;
+      const sort = document.getElementById('sort').value;
+
+      let picks = data.picks.filter(p => {
+        if (queue && p.queue !== queue) return false;
+        if (mustOnly && !p.rule?.mustPick) return false;
+        if (activeCategory) {
+          const cat = p.affinityReason || p.rule?.label || 'Altro';
+          if (cat !== activeCategory) return false;
+        }
+        if (q) {
+          const hay = [p.title, p.asin, p.affinityReason, p.rule?.label, p.rule?.pattern]
+            .filter(Boolean).join(' ').toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      const [field, dir] = sort.split('-');
+      const mul = dir === 'asc' ? 1 : -1;
+      picks.sort((a, b) => {
+        if (field === 'confidence') return mul * ((a.confidence || 0) - (b.confidence || 0));
+        if (field === 'value') return mul * ((a.value || 0) - (b.value || 0));
+        if (field === 'date') return mul * (new Date(a.event_time) - new Date(b.event_time));
+        return 0;
+      });
+
+      return picks;
+    }
+
+    function renderPickCard(p) {
+      const queueClass = 'badge-queue-' + (p.queue || 'unknown');
+      const rule = p.rule;
+      const ruleHtml = rule ? `
+        <div class="rule-detail">
+          <strong>${escapeHtml(rule.type)}</strong> · pattern <strong>${escapeHtml(rule.matchedPattern || rule.pattern)}</strong>
+          · score ${rule.score}${rule.mustPick ? ' · <span style="color:var(--green)">mustPick</span>' : ''}
+        </div>` : '';
+
+      return `
+        <article class="pick-card">
+          <div class="confidence-ring ${confidenceClass(p.confidence)}" title="Confidence">
+            ${Math.round(p.confidence)}%
+          </div>
+          <div class="pick-main">
+            <div class="pick-title">
+              <a href="${escapeAttr(p.detail_url)}" target="_blank" rel="noopener">${escapeHtml(p.title)}</a>
+            </div>
+            <div class="pick-meta">
+              <span class="badge ${queueClass}">${QUEUE_LABELS[p.queue] || p.queue}</span>
+              <span class="badge badge-category">${escapeHtml(p.affinityReason || rule?.label || '—')}</span>
+              ${rule?.mustPick ? '<span class="badge badge-must">Must pick</span>' : ''}
+              ${p.override ? '<span class="badge badge-override">Override</span>' : ''}
+              <span class="asin">${escapeHtml(p.asin)}</span>
+              <span>${fmtDate(p.event_time)}</span>
+            </div>
+            ${ruleHtml}
+          </div>
+          <div class="pick-scores">
+            <div class="price">${fmtMoney(p.value, p.currency)}</div>
+            <div class="score-row">Queue <strong>${p.queueScore ?? '—'}</strong></div>
+            <div class="score-row">Value <strong>${p.valueScore != null ? p.valueScore.toFixed(2) : '—'}</strong></div>
+            <div class="score-row">Affinity <strong>${p.affinityScore ?? '—'}</strong></div>
+          </div>
+        </article>`;
+    }
+
+    function renderPicks() {
+      const picks = getFilteredPicks();
+      const list = document.getElementById('picks-list');
+      document.getElementById('visible-count').textContent =
+        picks.length + ' di ' + data.picks.length + ' pick';
+
+      if (!picks.length) {
+        list.innerHTML = '<div class="empty-state">Nessun risultato con i filtri attuali.</div>';
+        return;
+      }
+      list.innerHTML = picks.map(renderPickCard).join('');
+    }
+
+    function initUI(json) {
+      data = json;
+      document.getElementById('load-panel').classList.add('hidden');
+      document.getElementById('app').classList.remove('hidden');
+
+      renderStats(json.summary);
+      buildQueueFilter(json.picks);
+      buildCategoryChips(json.picks);
+      renderPicks();
+
+      ['search', 'filter-queue', 'sort'].forEach(id => {
+        document.getElementById(id).addEventListener('input', renderPicks);
+        document.getElementById(id).addEventListener('change', renderPicks);
+      });
+      document.getElementById('must-only').addEventListener('change', renderPicks);
+    }
+
+    function showLoadPanel() {
+      document.getElementById('load-panel').classList.remove('hidden');
+    }
+
+    async function tryFetch() {
+      try {
+        const res = await fetch('backtest-picks.json');
+        if (!res.ok) throw new Error(res.statusText);
+        const json = await res.json();
+        if (!json.summary || !Array.isArray(json.picks)) throw new Error('Formato JSON non valido');
+        initUI(json);
+      } catch {
+        showLoadPanel();
+      }
+    }
+
+    document.getElementById('pick-file-btn').addEventListener('click', () => {
+      document.getElementById('file-input').click();
+    });
+
+    document.getElementById('file-input').addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const json = JSON.parse(await file.text());
+        if (!json.summary || !Array.isArray(json.picks)) throw new Error('Formato JSON non valido');
+        initUI(json);
+      } catch (err) {
+        alert('Errore lettura JSON: ' + err.message);
+      }
+    });
+
+    tryFetch();
+  </script>
+</body>
+</html>

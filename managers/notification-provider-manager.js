@@ -76,6 +76,8 @@ class TelegramNotificationProvider extends NotificationProvider {
         return 'rules';
       case 'llm':
         return 'AI';
+      case 'veto':
+        return 'veto';
       default:
         return '';
     }

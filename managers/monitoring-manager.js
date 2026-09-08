@@ -18,6 +18,7 @@ class MonitoringManager extends BaseManager {
     this.monitoringTimer = null;
     this.eventSource = null;
     this.liveReconnectTimer = null;
+    this.recommendationIdTemplate = '';
 
     // Polling health/reliability state
     this.isChecking = false;
@@ -791,7 +792,10 @@ class MonitoringManager extends BaseManager {
 
   // Inject new item tiles into the current page's grid without refreshing
   injectNewItemTiles(newItems) {
-    const grid = document.getElementById('vvp-items-grid');
+    // On an empty queue Amazon renders no grid, so create one instead of
+    // dropping items that were already marked as notified
+    const grid = document.getElementById('vvp-items-grid') ||
+      (typeof window.vineEnsureItemsGrid === 'function' ? window.vineEnsureItemsGrid() : null);
     if (!grid) {
       console.log('[MonitoringManager] No grid found on page, cannot inject items');
       return;
@@ -820,8 +824,16 @@ class MonitoringManager extends BaseManager {
     }
 
     if (injectedCount > 0) {
+      this.hideNoOffersMessage();
       console.log(`[MonitoringManager] Injected ${injectedCount} new item tiles into the page`);
     }
+  }
+
+  // The "no offers for you" block is stale once we inject items into the page
+  hideNoOffersMessage() {
+    document.querySelectorAll('.vvp-no-offers-msg').forEach((element) => {
+      element.style.display = 'none';
+    });
   }
 
   prepareInjectedTile(tile, item) {
@@ -900,11 +912,6 @@ class MonitoringManager extends BaseManager {
       seenItemsManager.processItem(tile);
     }
 
-    const bookmarkManager = enhancer.getManager('bookmarks');
-    if (bookmarkManager?.processItem && !tile.hasAttribute('data-vine-bookmark-processed')) {
-      bookmarkManager.processItem(tile);
-    }
-
     const rocketManager = enhancer.getManager('rocket');
     if (rocketManager?.processItem && !tile.hasAttribute('data-vine-rocket-processed')) {
       rocketManager.processItem(tile);
@@ -961,6 +968,12 @@ class MonitoringManager extends BaseManager {
     const asinInput = document.createElement('input');
     asinInput.type = 'hidden';
     asinInput.setAttribute('data-asin', item.asin);
+    if (item.recommendationId) {
+      asinInput.setAttribute('data-recommendation-id', item.recommendationId);
+    }
+    if (item.recommendationType) {
+      asinInput.setAttribute('data-recommendation-type', item.recommendationType);
+    }
     content.appendChild(asinInput);
 
     const badge = document.createElement('div');
@@ -1106,9 +1119,42 @@ class MonitoringManager extends BaseManager {
     }
   }
 
+  getRecommendationIdTemplate() {
+    if (this.recommendationIdTemplate) {
+      return this.recommendationIdTemplate;
+    }
+
+    const native = document.querySelector(
+      '#vvp-items-grid .vvp-item-tile:not([data-vine-live-injected="true"]) [data-recommendation-id], #vvp-items-grid .vvp-item-tile:not([data-vine-live-injected="true"])[data-recommendation-id]'
+    );
+    const source = native || document.querySelector('[data-recommendation-id]');
+    const value = source?.getAttribute('data-recommendation-id') || '';
+    if (value.split('#').length >= 3) {
+      this.recommendationIdTemplate = value;
+    }
+
+    return this.recommendationIdTemplate;
+  }
+
   buildRecommendationId(item) {
-    if (item?.recommendationId || !item?.asin || !item?.enrollmentGuid) {
-      return item?.recommendationId || '';
+    if (item?.recommendationId) {
+      return item.recommendationId;
+    }
+
+    if (!item?.asin) {
+      return '';
+    }
+
+    const fromTemplate = window.VineRecommendationId?.buildRecommendationIdFromTemplate(
+      this.getRecommendationIdTemplate(),
+      item.asin
+    );
+    if (fromTemplate) {
+      return fromTemplate;
+    }
+
+    if (!item.enrollmentGuid) {
+      return '';
     }
 
     const context = this.getVvpContext();
@@ -1343,14 +1389,8 @@ class MonitoringManager extends BaseManager {
     }
 
     try {
-      // Wait for grid to be available
-      const grid = document.getElementById('vvp-items-grid');
-      if (!grid) {
-        return;
-      }
-
-      // Get all items on the page
-      const items = grid.querySelectorAll('.vvp-item-tile');
+      // The repository is the source of truth here: an empty queue has no grid
+      // on the page, but items discovered by polling still need notifying
 
       // Find new items to notify about
       // New items are: seen=true, notified=false, hidden=false
@@ -1375,15 +1415,10 @@ class MonitoringManager extends BaseManager {
     console.log('[MonitoringManager] Scanning current page for new items');
 
     try {
-      // Wait for grid to be available
+      // No grid means an empty queue, not an error: keep scanning the
+      // repository so polled items are still reported
       const grid = document.getElementById('vvp-items-grid');
-      if (!grid) {
-        console.log('[MonitoringManager] No grid found on page');
-        return [];
-      }
-
-      // Get all items on the page
-      const items = grid.querySelectorAll('.vvp-item-tile');
+      const items = grid ? grid.querySelectorAll('.vvp-item-tile') : [];
       console.log(`[MonitoringManager] Found ${items.length} items on page`);
 
       // Find new items to notify about

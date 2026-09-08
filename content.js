@@ -194,7 +194,10 @@ class AmazonVineEnhancer {
         // Resolve if either the grid exists with items OR the tab content exists (even without items)
         if ((grid && grid.children.length > 0) || tabContent) {
           console.log('[Vine Enhancer] Page ready:', grid ? 'with products' : 'without products');
-          resolve(grid || tabContent);
+          // On an empty queue Amazon renders no grid at all: build one so the
+          // managers that wait for it (and monitoring injection) still work
+          const ensuredGrid = grid || window.vineEnsureItemsGrid();
+          resolve(ensuredGrid || tabContent);
         } else {
           setTimeout(checkGrid, 100);
         }
@@ -325,7 +328,6 @@ class AmazonVineEnhancer {
     this.managers.storage = new StorageManager();
     this.managers.filter = new FilterManager();
     this.managers.seenItems = new SeenItemsManager();
-    this.managers.bookmarks = new BookmarkManager();
     this.managers.rocket = new RocketManager();
     this.managers.newItems = new NewItemsManager();
     this.managers.pageDetection = new PageDetectionManager();
@@ -355,7 +357,6 @@ class AmazonVineEnhancer {
   setupManagerCommunication() {
     // Setup dependencies between managers
     this.managers.seenItems.setStorageManager(this.managers.storage);
-    this.managers.bookmarks.setStorageManager(this.managers.storage);
     this.managers.newItems.setStorageManager(this.managers.storage);
 
     // Setup monitoring dependencies
@@ -375,11 +376,6 @@ class AmazonVineEnhancer {
       this.managers.seenItems.toggleItemSeen(data.title, data.item);
     });
 
-    // Special keyboard manager event handling for bookmarks
-    window.vineEventBus.on('toggleItemBookmark', (data) => {
-      this.managers.bookmarks.toggleItemBookmark(data.title, data.url, data.pageNumber, data.pageUrl, data.item);
-    });
-
     // Table view event handlers - sync with card view
     window.vineEventBus.on('toggleSeenFromTable', (data) => {
       const item = document.querySelector(`.vvp-item-tile[data-vine-item-id="${data.itemId}"]`);
@@ -390,23 +386,6 @@ class AmazonVineEnhancer {
           // Update table row
           const isSeen = item.classList.contains('vine-seen');
           this.managers.ui.updateTableRow(data.itemId, { seen: isSeen });
-        }
-      }
-    });
-
-    window.vineEventBus.on('toggleBookmarkFromTable', (data) => {
-      const item = document.querySelector(`.vvp-item-tile[data-vine-item-id="${data.itemId}"]`);
-      if (item) {
-        const title = item.querySelector('.vvp-item-product-title-container a')?.textContent.trim();
-        const url = item.querySelector('.vvp-item-product-title-container a')?.href;
-        const pageNumber = this.managers.ui.currentPage;
-        const pageUrl = window.location.href;
-        
-        if (title && url) {
-          this.managers.bookmarks.toggleItemBookmark(title, url, pageNumber, pageUrl, item);
-          // Update table row
-          const isBookmarked = item.classList.contains('vine-bookmarked');
-          this.managers.ui.updateTableRow(data.itemId, { bookmarked: isBookmarked });
         }
       }
     });
@@ -423,24 +402,11 @@ class AmazonVineEnhancer {
         this.managers.ui.updateTableRow(data.item.dataset.vineItemId, { seen: false });
       }
     });
-
-    window.vineEventBus.on('itemBookmarked', (data) => {
-      if (data.item && data.item.dataset.vineItemId) {
-        this.managers.ui.updateTableRow(data.item.dataset.vineItemId, { bookmarked: true });
-      }
-    });
-
-    window.vineEventBus.on('itemUnbookmarked', (data) => {
-      if (data.item && data.item.dataset.vineItemId) {
-        this.managers.ui.updateTableRow(data.item.dataset.vineItemId, { bookmarked: false });
-      }
-    });
     
     // Expose some managers globally for advanced usage
     window.vinePageManager = this.managers.page;
     window.vineKeyboardManager = this.managers.keyboard;
     window.vineStorageManager = this.managers.storage;
-    window.vineBookmarkManager = this.managers.bookmarks;
     window.vineNewItemsManager = this.managers.newItems;
     window.vineMonitoringManager = this.managers.monitoring;
     window.vineNotificationProvider = this.managers.notificationProvider;
@@ -451,10 +417,9 @@ class AmazonVineEnhancer {
   async startManagers() {
     // Initialize managers in the correct order
     const initOrder = [
-      'storage',             // Must be first to load seen items and bookmarks
+      'storage',             // Must be first to load seen items
       'filter',              // Independent
       'seenItems',           // Depends on storage
-      'bookmarks',           // Depends on storage
       'rocket',              // Handles instant-order tile actions
       'newItems',            // Depends on storage
       'pageDetection',       // Independent
@@ -530,7 +495,6 @@ class AmazonVineEnhancer {
     delete window.vinePageManager;
     delete window.vineKeyboardManager;
     delete window.vineStorageManager;
-    delete window.vineBookmarkManager;
     delete window.vineNewItemsManager;
     delete window.vineAutopickManager;
     

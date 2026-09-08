@@ -6,6 +6,9 @@
   let successReported = false;
   let orderButtonClicked = false;
   let errorReported = false;
+  let aborted = false;
+  let intervalId = null;
+  let observer = null;
 
   function postToParent(message) {
     window.parent.postMessage(message, '*');
@@ -17,8 +20,19 @@
       document.querySelector('.place-your-order-button');
   }
 
+  function stopAutomation() {
+    if (intervalId !== null) {
+      window.clearInterval(intervalId);
+      intervalId = null;
+    }
+    if (observer) {
+      observer.disconnect();
+      observer = null;
+    }
+  }
+
   function attemptPlaceOrder() {
-    if (successReported || orderButtonClicked) {
+    if (aborted || successReported || orderButtonClicked) {
       return false;
     }
 
@@ -92,26 +106,36 @@
     return isVisible;
   }
 
-  const intervalId = window.setInterval(() => {
-    if (checkSuccess()) {
-      window.clearInterval(intervalId);
+  // Parent-driven kill switch: stops polling before the Place Order click can fire.
+  // The parent also blanks the frame, so this may not get the chance to run.
+  window.addEventListener('message', (event) => {
+    if (event.source !== window.parent || event.data !== 'vine_abort_order') {
       return;
     }
 
-    checkError();
-    attemptPlaceOrder();
-  }, 50);
-
-  const observer = new MutationObserver(() => {
-    if (checkSuccess()) {
-      observer.disconnect();
-      window.clearInterval(intervalId);
-      return;
-    }
-
-    checkError();
-    attemptPlaceOrder();
+    aborted = true;
+    stopAutomation();
+    postToParent({ type: 'vine_order_aborted', alreadyClicked: orderButtonClicked });
   });
+
+  function tick() {
+    if (aborted) {
+      stopAutomation();
+      return;
+    }
+
+    if (checkSuccess()) {
+      stopAutomation();
+      return;
+    }
+
+    checkError();
+    attemptPlaceOrder();
+  }
+
+  intervalId = window.setInterval(tick, 50);
+
+  observer = new MutationObserver(tick);
 
   observer.observe(document.documentElement, {
     childList: true,

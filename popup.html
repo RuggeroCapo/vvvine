@@ -103,7 +103,7 @@
         <h2 class="card-title">Autopick Scoring</h2>
       </div>
       <div class="card-content">
-        <p class="card-description">Score Vine items with JSON rules and optional Gemini AI. Ordering is not triggered yet — scores appear on item cards.</p>
+        <p class="card-description">Score Vine items with JSON rules and optional Gemini AI. Scores appear on item cards; enable Real Autopick to actually place orders.</p>
 
         <div class="toggle-container">
           <div class="toggle-info">
@@ -112,6 +112,17 @@
           </div>
           <label class="toggle-switch">
             <input type="checkbox" id="autopick-enabled" class="toggle-input">
+            <div class="toggle-slider"></div>
+          </label>
+        </div>
+
+        <div class="toggle-container">
+          <div class="toggle-info">
+            <h3>Real Autopick (live orders)</h3>
+            <p>Triggers the 🚀 rocket order on items above threshold. Off = "would pick" only</p>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="autopick-live-enabled" class="toggle-input">
             <div class="toggle-slider"></div>
           </label>
         </div>

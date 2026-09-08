@@ -17,6 +17,7 @@ class RocketManager extends BaseManager {
     this.csrfToken = '';
     this.orderStartTime = 0;
     this.isOrdering = false;
+    this.placeOrderClicked = false;
     this.activeButton = null;
     this.activeOrder = null;
     this.activeOrderSource = null;
@@ -160,9 +161,10 @@ class RocketManager extends BaseManager {
       await this.handleRocketClick(button, itemData);
     });
 
-    const content = item.querySelector('.vvp-item-tile-content');
-    if (content) {
-      content.appendChild(button);
+    const host = window.vineAutopickManager?.getTileActionHost?.(item) ||
+      item.querySelector('.vvp-item-tile-content');
+    if (host) {
+      host.appendChild(button);
     }
   }
 
@@ -195,6 +197,7 @@ class RocketManager extends BaseManager {
     }
 
     this.isOrdering = true;
+    this.placeOrderClicked = false;
     this.activeButton = button;
     this.activeOrder = itemData;
     this.activeOrderSource = source;
@@ -474,7 +477,9 @@ class RocketManager extends BaseManager {
 
   submitCheckoutForm({ asin, offerListingID, vinePromotionId }) {
     this.createOverlay();
-    this.hideIframe();
+    // Keep the checkout frame visible through the navigation; it stays up until the
+    // order finishes (success hides the overlay, errors leave it open for inspection).
+    this.showIframe();
 
     const previousForm = document.getElementById('vine-rocket-checkout-form');
     if (previousForm) {
@@ -524,6 +529,7 @@ class RocketManager extends BaseManager {
         <div class="vine-overlay-header">
           <button id="vine-manual-toggle" class="vine-overlay-toggle" type="button" style="display:none;">Show Checkout</button>
           <h3 id="vine-overlay-message" class="vine-overlay-message">Preparing order...</h3>
+          <button id="vine-overlay-abort" class="vine-overlay-abort" type="button" aria-label="Abort order and stop automation">⛔ Blocca ordine</button>
           <button id="vine-overlay-close" class="vine-overlay-close" type="button" aria-label="Close rocket overlay">✕</button>
         </div>
         <iframe
@@ -536,6 +542,11 @@ class RocketManager extends BaseManager {
     `;
 
     document.body.appendChild(overlay);
+
+    const abortButton = overlay.querySelector('#vine-overlay-abort');
+    abortButton?.addEventListener('click', () => {
+      this.abortOrder('manual-abort');
+    });
 
     const closeButton = overlay.querySelector('#vine-overlay-close');
     closeButton?.addEventListener('click', () => {
@@ -569,7 +580,10 @@ class RocketManager extends BaseManager {
     const overlay = this.createOverlay();
     this.updateOverlayMessage(message);
     overlay.style.display = 'flex';
-    this.hideIframe();
+    // Show the checkout iframe from the start so the automation stays watchable for the
+    // whole order; it is only torn down once the order completes. Use the header toggle
+    // to collapse it manually.
+    this.showIframe();
   }
 
   updateOverlayMessage(message) {
@@ -603,13 +617,92 @@ class RocketManager extends BaseManager {
     }
   }
 
+  // Panic button: kill the in-flight checkout and stop the automation that feeds it.
+  // Tears down the frame first (that is the only guaranteed stop), then reconciles the
+  // parent-side state so autopick's placeOrderAndAwait resolves instead of hanging.
+  abortOrder(reason = 'manual-abort') {
+    const wasOrdering = this.isOrdering;
+    const alreadyClicked = this.placeOrderClicked;
+
+    const frame = document.getElementById('vine_checkout_frame');
+    if (frame) {
+      // Best-effort notice to checkout-automation.js; it may not survive the blanking below.
+      try {
+        frame.contentWindow?.postMessage('vine_abort_order', '*');
+      } catch (error) {
+        // Cross-origin frame already gone — blanking it is enough.
+      }
+      frame.src = 'about:blank';
+    }
+
+    document.getElementById('vine-rocket-checkout-form')?.remove();
+
+    const stopped = this.stopPipeline();
+
+    if (wasOrdering) {
+      this.emitOrderResult('rocketOrderError', { reason });
+    }
+    this.resetActiveOrderState();
+
+    this.hideIframe();
+    this.updateOverlayMessage('Order aborted');
+    const overlay = document.getElementById('vine-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+
+    const stoppedText = stopped.length ? ` — stopped: ${stopped.join(', ')}` : '';
+    const message = alreadyClicked
+      ? `Aborted after Place Order was clicked — verify on Amazon${stoppedText}`
+      : `Order aborted${stoppedText}`;
+
+    this.showToast(message, alreadyClicked ? 'warning' : 'error');
+    console.warn(`[Vine Rocket] Abort (${reason})`, { wasOrdering, alreadyClicked, stopped });
+
+    return { wasOrdering, alreadyClicked, stopped };
+  }
+
+  // Stop whatever would start the next order right after this one is killed.
+  stopPipeline() {
+    const stopped = [];
+
+    const autopick = window.vineAutopickManager;
+    if (autopick?.kill) {
+      autopick.kill();
+      stopped.push('autopick');
+    }
+
+    const monitoring = window.vineMonitoringManager;
+    if (monitoring?.isMonitoring) {
+      Promise.resolve(monitoring.stopMonitoring())
+        .catch((error) => console.error('[Vine Rocket] Failed to stop monitoring:', error));
+      stopped.push('monitoring');
+    }
+
+    this.emit('rocketEmergencyStop', { stopped });
+    return stopped;
+  }
+
   handleWindowMessage(event) {
     if (event.source === window) {
       return;
     }
 
+    // After an abort the frame is blanked but a late message can still land; without
+    // an active order there is nothing to report, so drop everything except the
+    // abort acknowledgement instead of toasting a stale result.
+    if (!this.isOrdering && event.data?.type !== 'vine_order_aborted') {
+      return;
+    }
+
     if (event.data === 'vine_status_placing_order') {
+      this.placeOrderClicked = true;
       this.updateOverlayMessage('Confirming order...');
+      return;
+    }
+
+    if (event.data?.type === 'vine_order_aborted') {
+      console.warn('[Vine Rocket] Checkout frame confirmed abort', event.data);
       return;
     }
 
@@ -646,6 +739,7 @@ class RocketManager extends BaseManager {
     }
 
     this.isOrdering = false;
+    this.placeOrderClicked = false;
     this.activeButton = null;
     this.activeOrder = null;
     this.activeOrderSource = null;
