@@ -524,6 +524,7 @@ function getAutopickDefaults() {
     liveOrdering: false,
     dryRun: true,
     thresholdPercent: 75,
+    useFallbackAddress: true,
     llm: {
       enabled: false,
       provider: 'gemini',
@@ -547,6 +548,7 @@ async function loadAutopickConfig() {
     document.getElementById('autopick-live-enabled').checked = live;
     autopickLiveWasEnabled = live;
     document.getElementById('autopick-threshold').value = config.thresholdPercent ?? 75;
+    document.getElementById('autopick-use-fallback-address').checked = config.useFallbackAddress !== false;
     document.getElementById('autopick-llm-enabled').checked = Boolean(llm.enabled);
     document.getElementById('autopick-gemini-model').value = llm.model || 'gemini-2.0-flash';
     document.getElementById('autopick-gemini-api-key').value = llm.apiKey || '';
@@ -573,6 +575,7 @@ function collectAutopickConfigFromForm() {
       liveOrdering,
       dryRun: !liveOrdering,
       thresholdPercent: parseInt(document.getElementById('autopick-threshold').value, 10) || 75,
+      useFallbackAddress: document.getElementById('autopick-use-fallback-address').checked,
       llm: {
         ...defaults.llm,
         ...(existing.llm || {}),

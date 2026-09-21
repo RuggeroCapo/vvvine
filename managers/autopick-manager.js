@@ -32,6 +32,7 @@ class AutopickManager extends BaseManager {
       // dryRun is kept as its mirror so older code/configs keep working.
       liveOrdering: false,
       dryRun: true,
+      useFallbackAddress: true,
       cooldownSeconds: 30,
       dailyCap: 5,
       globalValueCeiling: 1500,
@@ -330,20 +331,29 @@ class AutopickManager extends BaseManager {
         }
       }, timeoutMs);
 
-      chrome.runtime.sendMessage(message, (response) => {
-        if (settled) {
-          return;
-        }
+      // sendMessage throws synchronously once the extension has been
+      // reloaded under this page; resolve instead of rejecting the caller.
+      try {
+        chrome.runtime.sendMessage(message, (response) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          clearTimeout(timer);
+
+          if (chrome.runtime.lastError) {
+            resolve({ ok: false, reason: chrome.runtime.lastError.message });
+            return;
+          }
+
+          resolve(response || { ok: false, reason: 'empty-response' });
+        });
+      } catch (error) {
         settled = true;
         clearTimeout(timer);
-
-        if (chrome.runtime.lastError) {
-          resolve({ ok: false, reason: chrome.runtime.lastError.message });
-          return;
-        }
-
-        resolve(response || { ok: false, reason: 'empty-response' });
-      });
+        window.vineExtensionContext?.handle(error, 'AutopickManager.sendMessage');
+        resolve({ ok: false, reason: error.message || 'send-failed' });
+      }
     });
   }
 

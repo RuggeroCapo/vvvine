@@ -10,6 +10,19 @@
   let intervalId = null;
   let observer = null;
 
+  // Backup shipping address (Milan) used when Amazon can't ship an item to the
+  // primary Vine address; tried once per order before giving up.
+  const FALLBACK_ADDRESS_ID = '7ESUR7HHK2O664MWXL2IG12M42N5X1RHEA2OEHR1X5N24MLPXTQ2FAA2OXQACVRO';
+  let fallbackAddressAttempted = false;
+  let switchingAddress = false;
+  let useFallbackAddress = true;
+
+  chrome.storage.local.get(['vineAutopickConfig']).then((result) => {
+    if (result.vineAutopickConfig?.useFallbackAddress === false) {
+      useFallbackAddress = false;
+    }
+  }).catch(() => {});
+
   function postToParent(message) {
     window.parent.postMessage(message, '*');
   }
@@ -18,6 +31,71 @@
     return document.getElementById('placeOrder') ||
       document.querySelector('input[name="placeYourOrder1"]') ||
       document.querySelector('.place-your-order-button');
+  }
+
+  function findDestinationShipError() {
+    const el = document.querySelector('[data-messageid="LineItemDestinationNoValidShipOptionCVMessage"]');
+    if (!el) {
+      return null;
+    }
+
+    const visible = el.offsetParent !== null || window.getComputedStyle(el).display !== 'none';
+    return visible ? el : null;
+  }
+
+  function findFallbackAddressOption() {
+    const legacySelect = document.querySelector('select[name="line-item-address"]');
+    if (legacySelect) {
+      const option = Array.from(legacySelect.options)
+        .find((opt) => opt.value.includes(FALLBACK_ADDRESS_ID));
+      if (option) {
+        return { type: 'select', select: legacySelect, option };
+      }
+    }
+
+    const radio = document.querySelector(`input[type="radio"][value*="addressID=${FALLBACK_ADDRESS_ID}"]`);
+    if (radio) {
+      return { type: 'radio', radio };
+    }
+
+    return null;
+  }
+
+  function findAddressContinueButton() {
+    return document.querySelector('#checkout-secondary-continue-button-id input[data-testid="secondary-continue-button"]') ||
+      document.querySelector('#checkout-secondary-continue-button-id input[type="submit"]') ||
+      document.querySelector('input[data-testid="secondary-continue-button"]');
+  }
+
+  function switchToFallbackAddress() {
+    return new Promise((resolve) => {
+      const target = findFallbackAddressOption();
+      if (!target) {
+        resolve(false);
+        return;
+      }
+
+      if (target.type === 'select') {
+        target.select.value = target.option.value;
+        target.select.dispatchEvent(new Event('input', { bubbles: true }));
+        target.select.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        target.radio.checked = true;
+        target.radio.dispatchEvent(new Event('click', { bubbles: true }));
+        target.radio.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+
+      window.setTimeout(() => {
+        const continueButton = findAddressContinueButton();
+        if (!continueButton) {
+          resolve(false);
+          return;
+        }
+
+        continueButton.click();
+        resolve(true);
+      }, 500);
+    });
   }
 
   function stopAutomation() {
@@ -32,7 +110,7 @@
   }
 
   function attemptPlaceOrder() {
-    if (aborted || successReported || orderButtonClicked) {
+    if (aborted || successReported || orderButtonClicked || switchingAddress) {
       return false;
     }
 
@@ -85,6 +163,36 @@
   }
 
   function checkError() {
+    const destinationError = findDestinationShipError();
+    if (destinationError) {
+      if (!useFallbackAddress) {
+        if (!errorReported) {
+          errorReported = true;
+          postToParent('vine_error_detected');
+        }
+        return true;
+      }
+
+      if (!fallbackAddressAttempted && !switchingAddress) {
+        switchingAddress = true;
+        fallbackAddressAttempted = true;
+        orderButtonClicked = false;
+
+        switchToFallbackAddress().then((switched) => {
+          switchingAddress = false;
+          if (!switched && !errorReported && !aborted) {
+            errorReported = true;
+            postToParent('vine_error_detected');
+          }
+        });
+      } else if (!switchingAddress && !errorReported) {
+        errorReported = true;
+        postToParent('vine_error_detected');
+      }
+
+      return true;
+    }
+
     const errorElement = document.querySelector('.a-alert-error') ||
       document.querySelector('#message_error') ||
       document.querySelector('.a-message-error') ||

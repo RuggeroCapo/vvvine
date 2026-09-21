@@ -51,6 +51,7 @@
       ],
       "js": [
         "debug/flow-inspector.js",
+        "services/extension-context.js",
         "services/items-repository.js",
         "managers/base-manager.js",
         "managers/storage-manager.js",

@@ -171,6 +171,10 @@ class MonitoringManager extends BaseManager {
       console.log('[MonitoringManager] Received manualRefresh event');
       this.performManualRefresh();
     });
+    this.on('extensionContextInvalidated', () => {
+      console.warn('[MonitoringManager] Extension context invalidated, stopping monitoring');
+      this.stopMonitoring();
+    });
   }
 
   async loadMonitoringState() {
@@ -344,6 +348,14 @@ class MonitoringManager extends BaseManager {
       return;
     }
 
+    // The extension was reloaded under us: every chrome.* call would throw,
+    // so stop rather than reschedule a check that can only fail.
+    if (window.vineExtensionContext && !window.vineExtensionContext.isValid()) {
+      console.warn('[MonitoringManager] Extension context invalidated, not scheduling next check');
+      this.stopMonitoring();
+      return;
+    }
+
     const delayMs = this.computeNextDelayMs();
     console.log(`[MonitoringManager] Next check in ${Math.round(delayMs / 1000)}s (consecutive failures: ${this.consecutiveFailures})`);
 
@@ -352,7 +364,9 @@ class MonitoringManager extends BaseManager {
       try {
         await this.checkAllQueues();
       } catch (error) {
-        console.error('[MonitoringManager] Unhandled error during scheduled check:', error);
+        if (!window.vineExtensionContext?.handle(error, 'MonitoringManager.scheduledCheck')) {
+          console.error('[MonitoringManager] Unhandled error during scheduled check:', error);
+        }
       } finally {
         this.scheduleNextCheck();
       }
@@ -415,7 +429,11 @@ class MonitoringManager extends BaseManager {
           }
 
           const items = this.parseItemsFromHtml(html, queue);
-          console.log(`[MonitoringManager] Parsed ${items.length} items from ${queue}`);
+          // Log the actual products, not just the count: if persistence
+          // fails afterwards (e.g. invalidated context) the console is the
+          // only remaining trace of what was on the queue.
+          console.log(`[MonitoringManager] Parsed ${items.length} items from ${queue}`,
+            items.map(item => `${item.asin} - ${item.title || '(no title)'}`));
 
           return { queue, items, error: null, sessionExpired: false };
         } catch (error) {
@@ -634,8 +652,34 @@ class MonitoringManager extends BaseManager {
       }
     }
 
+    if (allNewItems.length > 0) {
+      // Printed before the save so the products survive in the console even
+      // if persisting them fails.
+      console.log(`[MonitoringManager] New items detected (${allNewItems.length}):`,
+        allNewItems.map(item => ({
+          asin: item.asin,
+          title: item.title || '(no title)',
+          queue: item.queue,
+          price: item.price ?? null,
+          url: item.url || ''
+        })));
+    }
+
     if (hasRepositoryChanges) {
-      await this.repository.save();
+      const unsavedSummary = () =>
+        allNewItems.map(item => `${item.asin} - ${item.title || '(no title)'}`);
+
+      try {
+        const saved = await this.repository.save();
+        if (saved === false) {
+          console.warn('[MonitoringManager] Repository save skipped, these items are only in memory:',
+            unsavedSummary());
+        }
+      } catch (error) {
+        console.error('[MonitoringManager] Repository save failed, these items are only in memory:',
+          unsavedSummary(), error);
+        throw error;
+      }
     }
 
     if (allNewItems.length > 0) {

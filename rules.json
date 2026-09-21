@@ -454,6 +454,13 @@
     },
     {
       "type": "brand",
+      "pattern": "Sonoff",
+      "score": 8,
+      "label": "smart home",
+      "exclude": []
+    },
+    {
+      "type": "brand",
       "pattern": "Nanoleaf",
       "score": 8,
       "label": "smart home",
@@ -1001,8 +1008,16 @@
     {
       "type": "brand",
       "pattern": "SIHOO",
-      "score": 8,
-      "label": "furniture"
+      "score": 9,
+      "label": "gaming chairs",
+      "requiresAny": [
+        "sedia",
+        "sedia gaming",
+        "gaming chair",
+        "sedia da gioco",
+        "sedia ergonomica",
+        "sedia da ufficio"
+      ]
     },
     {
       "type": "brand",

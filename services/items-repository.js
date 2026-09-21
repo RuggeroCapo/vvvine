@@ -22,6 +22,11 @@ class ItemsRepository {
    * Load items from storage
    */
   async load() {
+    if (window.vineExtensionContext && !window.vineExtensionContext.isValid()) {
+      console.warn('ItemsRepository: Extension context invalidated, skipping load');
+      return this.items;
+    }
+
     try {
       const result = await chrome.storage.local.get([this.STORAGE_KEY]);
       const itemsData = result[this.STORAGE_KEY] || {};
@@ -37,6 +42,9 @@ class ItemsRepository {
 
       return this.items;
     } catch (error) {
+      if (window.vineExtensionContext?.handle(error, 'ItemsRepository.load')) {
+        return this.items;
+      }
       console.error('ItemsRepository: Error loading items:', error);
       throw error;
     }
@@ -46,6 +54,14 @@ class ItemsRepository {
    * Save items to storage
    */
   async save() {
+    // Writes are impossible once the extension context is gone; failing
+    // silently here keeps the in-memory state usable for the rest of the
+    // session instead of blowing up every caller.
+    if (window.vineExtensionContext && !window.vineExtensionContext.isValid()) {
+      console.warn('ItemsRepository: Extension context invalidated, skipping save');
+      return false;
+    }
+
     try {
       const itemsData = Object.fromEntries(this.items);
       console.log(`ItemsRepository: Saving ${this.items.size} items to storage`);
@@ -55,6 +71,9 @@ class ItemsRepository {
       console.log(`ItemsRepository: Successfully saved to ${this.STORAGE_KEY}`);
       return true;
     } catch (error) {
+      if (window.vineExtensionContext?.handle(error, 'ItemsRepository.save')) {
+        return false;
+      }
       console.error('ItemsRepository: Error saving items:', error);
       throw error;
     }
